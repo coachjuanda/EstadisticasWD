@@ -1,0 +1,23 @@
+import { createClient } from '@/lib/supabase/server';
+import { loadTeamSummary } from '@/lib/reports/teamSummary';
+import { buildTeamSummaryExcel } from '@/lib/reports/excel/teamSummaryExcel';
+
+export async function GET(_request: Request, { params }: { params: Promise<{ rosterId: string }> }) {
+  const { rosterId } = await params;
+  const supabase = await createClient();
+
+  const result = await loadTeamSummary(supabase, rosterId);
+  if (!result.ok) {
+    return new Response('No autorizado', { status: result.reason === 'not_found' ? 404 : 403 });
+  }
+
+  const buffer = await buildTeamSummaryExcel(result.data);
+  const filename = `resumen-equipo-${result.data.teamName}-${result.data.tournamentName}`.replace(/[^a-zA-Z0-9-]+/g, '-');
+
+  return new Response(new Uint8Array(buffer), {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${filename}.xlsx"`,
+    },
+  });
+}
