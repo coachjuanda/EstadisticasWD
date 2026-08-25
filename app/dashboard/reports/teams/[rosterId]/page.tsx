@@ -1,10 +1,12 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { loadTeamSummary } from '@/lib/reports/teamSummary';
-import { StatsTables } from '../../StatsTables';
 
-export default async function TeamSummaryPage({
+// Esta pantalla se fusionó dentro de /dashboard/team-stats/[teamId] (tarjetas
+// + tabla de jugadores ordenable + gráfica de tendencia, todo junto). Queda
+// como redirect en vez de borrarse del todo para que ningún link/bookmark
+// viejo hacia acá caiga en un 404 -- el control de acceso real lo hace el
+// destino (loadTeamStats), esta pantalla solo resuelve el team_id/torneo.
+export default async function TeamSummaryRedirectPage({
   params,
 }: {
   params: Promise<{ rosterId: string }>;
@@ -12,50 +14,15 @@ export default async function TeamSummaryPage({
   const { rosterId } = await params;
   const supabase = await createClient();
 
-  const result = await loadTeamSummary(supabase, rosterId);
-  if (!result.ok) redirect('/dashboard?error=unauthorized');
-  const summary = result.data;
+  const { data: roster } = await supabase
+    .from('rosters')
+    .select('team_id, tournament_id')
+    .eq('id', rosterId)
+    .maybeSingle();
 
-  return (
-    <div className="mx-auto max-w-4xl p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-neutral-900">Resumen de equipo</h1>
-        <div className="flex gap-2">
-          <a
-            href={`/api/reports/teams/${rosterId}/pdf`}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
-          >
-            Descargar PDF
-          </a>
-          <a
-            href={`/api/reports/teams/${rosterId}/excel`}
-            className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
-          >
-            Descargar Excel
-          </a>
-        </div>
-      </div>
-      <p className="mt-1 text-sm text-neutral-500">
-        {summary.teamName}
-        {summary.divisionName ? ` (${summary.divisionName})` : ''} · {summary.tournamentName}
-        {' · '}
-        {summary.matchesConsidered} partido{summary.matchesConsidered === 1 ? '' : 's'} considerado
-        {summary.matchesConsidered === 1 ? '' : 's'}
-      </p>
+  if (!roster) {
+    redirect('/dashboard?error=unauthorized');
+  }
 
-      <div className="mt-6">
-        <StatsTables
-          teamName={summary.teamName}
-          fieldPlayers={summary.fieldPlayers}
-          goalies={summary.goalies}
-          teamStats={summary.teamStats}
-          statDefs={summary.statDefs}
-        />
-      </div>
-
-      <Link href="/dashboard" className="mt-6 inline-block text-sm text-neutral-500 hover:underline">
-        ← Volver
-      </Link>
-    </div>
-  );
+  redirect(`/dashboard/team-stats/${roster.team_id}?tournament_id=${roster.tournament_id}`);
 }

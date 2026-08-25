@@ -226,8 +226,11 @@ export default async function RostersPage({
               </p>
             </div>
             <div className="flex shrink-0 gap-3 text-sm">
-              <a href={`/dashboard/reports/teams/${r.id}`} className="text-brand-blue hover:underline">
-                Ver resumen
+              <a
+                href={`/dashboard/team-stats/${r.team_id}?tournament_id=${r.tournament_id}`}
+                className="text-brand-blue hover:underline"
+              >
+                Ver estadísticas
               </a>
               <a href={`/dashboard/admin/rosters?roster=${r.id}`} className="text-brand-blue hover:underline">
                 Ver nómina

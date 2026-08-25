@@ -11,6 +11,8 @@ type MatchRow = {
 
 type RosterRow = {
   id: string;
+  team_id: string;
+  tournament_id: string;
   teams: { name: string } | null;
   tournaments: { name: string } | null;
 };
@@ -42,7 +44,7 @@ export default async function CoachMatchesPage() {
             .returns<MatchRow[]>(),
           supabase
             .from('rosters')
-            .select('id, teams(name), tournaments(name)')
+            .select('id, team_id, tournament_id, teams(name), tournaments(name)')
             .in('team_id', teamIds)
             .returns<RosterRow[]>(),
         ])
@@ -58,16 +60,17 @@ export default async function CoachMatchesPage() {
       <h2 className="mt-6 text-sm font-semibold text-neutral-700">Resumen de equipo por torneo</h2>
       <div className="mt-2 flex flex-col gap-2">
         {rosterList.map((r) => (
-          <a
+          <div
             key={r.id}
-            href={`/dashboard/reports/teams/${r.id}`}
-            className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm hover:border-brand-blue"
+            className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3 text-sm"
           >
             <span>
               {r.teams?.name ?? '—'} · {r.tournaments?.name ?? '—'}
             </span>
-            <span className="text-brand-blue">Ver resumen →</span>
-          </a>
+            <a href={`/dashboard/team-stats/${r.team_id}?tournament_id=${r.tournament_id}`} className="text-brand-blue hover:underline">
+              Dashboard →
+            </a>
+          </div>
         ))}
         {rosterList.length === 0 && <p className="text-sm text-neutral-500">No tienes equipos asignados todavía.</p>}
       </div>

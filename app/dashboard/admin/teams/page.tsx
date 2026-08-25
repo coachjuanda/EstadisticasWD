@@ -96,6 +96,9 @@ export default async function TeamsPage({
                 <td className="py-2">{team.name}</td>
                 <td className="py-2">{team.divisions?.name ?? '—'}</td>
                 <td className="py-2 text-right">
+                  <a href={`/dashboard/team-stats/${team.id}`} className="mr-3 text-brand-blue hover:underline">
+                    Ver estadísticas
+                  </a>
                   <a
                     href={`/dashboard/admin/teams?edit=${team.id}`}
                     className="mr-3 text-brand-blue hover:underline"

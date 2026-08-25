@@ -84,16 +84,20 @@ export default async function AthleteProfilePage({
           <h2 className="text-sm font-semibold text-neutral-700">Resumen de equipo</h2>
           <div className="mt-2 flex flex-col gap-2">
             {athlete.teamMemberships.map((m) => (
-              <a
+              <div
                 key={m.rosterId}
-                href={`/dashboard/reports/teams/${m.rosterId}`}
-                className="flex items-center justify-between rounded-xl border border-neutral-200 p-3 text-sm hover:border-brand-blue"
+                className="flex items-center justify-between rounded-xl border border-neutral-200 p-3 text-sm"
               >
                 <span>
                   {m.teamName} · {m.tournamentName}
                 </span>
-                <span className="text-brand-blue">Ver resumen →</span>
-              </a>
+                <a
+                  href={`/dashboard/team-stats/${m.teamId}?tournament_id=${m.tournamentId}`}
+                  className="text-brand-blue hover:underline"
+                >
+                  Dashboard →
+                </a>
+              </div>
             ))}
           </div>
         </div>

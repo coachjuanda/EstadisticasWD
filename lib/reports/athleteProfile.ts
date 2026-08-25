@@ -27,7 +27,7 @@ export type AthleteProfileData = {
   selectedTournamentId: string | null;
   matchesInScope: number;
   statCards: AthleteStatCard[];
-  teamMemberships: { rosterId: string; teamName: string; tournamentName: string }[];
+  teamMemberships: { rosterId: string; teamId: string; tournamentId: string; teamName: string; tournamentName: string }[];
 };
 
 export async function loadAthleteProfile(
@@ -161,6 +161,8 @@ export async function loadAthleteProfile(
       statCards,
       teamMemberships: memberships.map((m) => ({
         rosterId: m.id,
+        teamId: m.team_id,
+        tournamentId: m.tournament_id,
         teamName: m.teams?.name ?? '—',
         tournamentName: m.tournaments?.name ?? '—',
       })),
