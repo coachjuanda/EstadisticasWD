@@ -220,7 +220,7 @@ export default async function MatchesPage({
           ) : (
             <div
               key={m.id}
-              className="flex items-start justify-between rounded-xl border border-neutral-200 p-4"
+              className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-neutral-200 p-4"
             >
               <div>
                 <p className="font-medium text-neutral-900">
@@ -249,7 +249,7 @@ export default async function MatchesPage({
                 >
                   {STATUS_LABELS[m.status] ?? m.status}
                 </span>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap justify-end gap-3">
                   {m.status !== 'programado' && (
                     <a href={`/dashboard/reports/matches/${m.id}`} className="text-brand-blue hover:underline">
                       Box score

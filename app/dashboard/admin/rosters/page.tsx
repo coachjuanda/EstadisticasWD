@@ -83,55 +83,57 @@ export default async function RostersPage({
           </p>
         )}
 
-        <table className="mt-6 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-neutral-200 text-left text-neutral-500">
-              <th className="py-2 font-medium">#</th>
-              <th className="py-2 font-medium">Deportista</th>
-              <th className="py-2 font-medium">Posición</th>
-              <th className="py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {playerList.map((p) => (
-              <tr key={p.id} className="border-b border-neutral-100">
-                <td className="py-2">{p.jersey_number ?? '—'}</td>
-                <td className="py-2">{p.athlete_profiles?.full_name ?? '—'}</td>
-                <td className="py-2">
-                  {p.athlete_profiles?.position ? (
-                    <span
-                      className={
-                        p.athlete_profiles.position === 'portero'
-                          ? 'rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700'
-                          : 'rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600'
-                      }
-                    >
-                      {POSITION_LABELS[p.athlete_profiles.position] ?? p.athlete_profiles.position}
-                    </span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td className="py-2 text-right">
-                  <form action={removeRosterPlayer} className="inline">
-                    <input type="hidden" name="id" value={p.id} />
-                    <input type="hidden" name="roster_id" value={rosterId} />
-                    <button type="submit" className="text-red-600 hover:underline">
-                      Quitar
-                    </button>
-                  </form>
-                </td>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-neutral-200">
+          <table className="w-full min-w-[440px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-neutral-500">
+                <th className="px-3 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">Deportista</th>
+                <th className="px-3 py-2 font-medium">Posición</th>
+                <th className="px-3 py-2"></th>
               </tr>
-            ))}
-            {playerList.length === 0 && (
-              <tr>
-                <td colSpan={4} className="py-4 text-neutral-500">
-                  Todavía no hay deportistas en esta nómina.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {playerList.map((p) => (
+                <tr key={p.id} className="border-b border-neutral-100">
+                  <td className="px-3 py-2">{p.jersey_number ?? '—'}</td>
+                  <td className="px-3 py-2">{p.athlete_profiles?.full_name ?? '—'}</td>
+                  <td className="px-3 py-2">
+                    {p.athlete_profiles?.position ? (
+                      <span
+                        className={
+                          p.athlete_profiles.position === 'portero'
+                            ? 'rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700'
+                            : 'rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600'
+                        }
+                      >
+                        {POSITION_LABELS[p.athlete_profiles.position] ?? p.athlete_profiles.position}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <form action={removeRosterPlayer} className="inline">
+                      <input type="hidden" name="id" value={p.id} />
+                      <input type="hidden" name="roster_id" value={rosterId} />
+                      <button type="submit" className="text-red-600 hover:underline">
+                        Quitar
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {playerList.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-4 text-neutral-500">
+                    Todavía no hay deportistas en esta nómina.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <h2 className="mt-8 text-sm font-semibold text-neutral-700">
           Agregar deportista
@@ -147,7 +149,7 @@ export default async function RostersPage({
               name="athlete_id"
               required
               disabled={availableAthletes.length === 0}
-              className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+              className="max-w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
             >
               {availableAthletes.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -215,7 +217,7 @@ export default async function RostersPage({
         {rosterList.map((r) => (
           <div
             key={r.id}
-            className="flex items-center justify-between rounded-xl border border-neutral-200 p-4"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 p-4"
           >
             <div>
               <p className="font-medium text-neutral-900">
@@ -256,7 +258,7 @@ export default async function RostersPage({
             name="team_id"
             required
             disabled={teamList.length === 0}
-            className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+            className="max-w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
           >
             {teamList.map((t) => (
               <option key={t.id} value={t.id}>
@@ -275,7 +277,7 @@ export default async function RostersPage({
             name="tournament_id"
             required
             disabled={tournamentList.length === 0}
-            className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+            className="max-w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
           >
             {tournamentList.map((t) => (
               <option key={t.id} value={t.id}>

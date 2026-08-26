@@ -73,7 +73,7 @@ export default async function AdminSurveysPage({
             name="title"
             required
             placeholder="Ej. Encuesta de seguimiento — temporada 2026"
-            className="w-72 rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+            className="w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm sm:w-72"
           />
         </div>
         <div className="flex flex-col gap-1">

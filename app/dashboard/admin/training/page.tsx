@@ -155,7 +155,7 @@ export default async function AdminTrainingPage({
             id="filter-athlete"
             name="athlete_id"
             defaultValue={athlete_id ?? ''}
-            className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+            className="max-w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
           >
             <option value="">Todos</option>
             {(athletes ?? []).map((a) => (
@@ -204,38 +204,40 @@ export default async function AdminTrainingPage({
           </div>
         </div>
       ) : (
-        <table className="mt-6 w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-neutral-200 text-left text-neutral-500">
-              <th className="py-2 font-medium">Deportista</th>
-              <th className="py-2 text-right font-medium">Convocatorias</th>
-              <th className="py-2 text-right font-medium">Presentes</th>
-              <th className="py-2 text-right font-medium">%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summary.map((a) => (
-              <tr key={a.athleteId} className="border-b border-neutral-100">
-                <td className="py-2">
-                  <a
-                    href={`/dashboard/admin/training?${new URLSearchParams({
-                      ...(division_id ? { division_id } : {}),
-                      ...(date_from ? { date_from } : {}),
-                      ...(date_to ? { date_to } : {}),
-                      athlete_id: a.athleteId,
-                    }).toString()}`}
-                    className="text-brand-blue hover:underline"
-                  >
-                    {a.fullName}
-                  </a>
-                </td>
-                <td className="py-2 text-right tabular-nums">{a.total}</td>
-                <td className="py-2 text-right tabular-nums">{a.present}</td>
-                <td className="py-2 text-right tabular-nums font-semibold">{a.pct}%</td>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-neutral-200">
+          <table className="w-full min-w-[420px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-neutral-500">
+                <th className="px-3 py-2 font-medium">Deportista</th>
+                <th className="px-3 py-2 text-right font-medium">Convocatorias</th>
+                <th className="px-3 py-2 text-right font-medium">Presentes</th>
+                <th className="px-3 py-2 text-right font-medium">%</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {summary.map((a) => (
+                <tr key={a.athleteId} className="border-b border-neutral-100">
+                  <td className="px-3 py-2">
+                    <a
+                      href={`/dashboard/admin/training?${new URLSearchParams({
+                        ...(division_id ? { division_id } : {}),
+                        ...(date_from ? { date_from } : {}),
+                        ...(date_to ? { date_to } : {}),
+                        athlete_id: a.athleteId,
+                      }).toString()}`}
+                      className="text-brand-blue hover:underline"
+                    >
+                      {a.fullName}
+                    </a>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{a.total}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{a.present}</td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{a.pct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {!athlete_id && summary.length === 0 && (
         <p className="mt-4 text-sm text-neutral-500">No hay convocatorias con ese filtro.</p>

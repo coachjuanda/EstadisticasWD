@@ -33,7 +33,7 @@ export default async function TeamStatsPage({
   const team = result.data;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
+    <div className="mx-auto w-full max-w-5xl p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">

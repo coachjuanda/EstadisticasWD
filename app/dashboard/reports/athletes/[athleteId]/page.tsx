@@ -21,7 +21,7 @@ export default async function AthleteProfilePage({
   const exportQuery = tournamentFilter ? `?tournament_id=${tournamentFilter}` : '';
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
+    <div className="mx-auto w-full max-w-2xl p-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">{athlete.fullName}</h1>
         <div className="flex gap-2">

@@ -46,84 +46,86 @@ export default async function TeamsPage({
         </p>
       )}
 
-      <table className="mt-6 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-neutral-200 text-left text-neutral-500">
-            <th className="py-2 font-medium">Nombre</th>
-            <th className="py-2 font-medium">División</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {(teams ?? []).map((team) =>
-            edit === team.id ? (
-              <tr key={team.id} className="border-b border-neutral-100">
-                <td colSpan={3} className="py-3">
-                  <form action={updateTeam} className="flex flex-wrap items-center gap-2">
-                    <input type="hidden" name="id" value={team.id} />
-                    <input
-                      name="name"
-                      defaultValue={team.name}
-                      required
-                      className="rounded-lg border border-neutral-300 px-2 py-1"
-                    />
-                    <select
-                      name="division_id"
-                      defaultValue={team.division_id}
-                      required
-                      className="rounded-lg border border-neutral-300 px-2 py-1"
-                    >
-                      {(divisions ?? []).map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-brand-blue px-3 py-1 text-white hover:bg-brand-blue-hover"
-                    >
-                      Guardar
-                    </button>
-                    <a href="/dashboard/admin/teams" className="text-neutral-500 hover:underline">
-                      Cancelar
-                    </a>
-                  </form>
-                </td>
-              </tr>
-            ) : (
-              <tr key={team.id} className="border-b border-neutral-100">
-                <td className="py-2">{team.name}</td>
-                <td className="py-2">{team.divisions?.name ?? '—'}</td>
-                <td className="py-2 text-right">
-                  <a href={`/dashboard/team-stats/${team.id}`} className="mr-3 text-brand-blue hover:underline">
-                    Ver estadísticas
-                  </a>
-                  <a
-                    href={`/dashboard/admin/teams?edit=${team.id}`}
-                    className="mr-3 text-brand-blue hover:underline"
-                  >
-                    Editar
-                  </a>
-                  <form action={deleteTeam} className="inline">
-                    <input type="hidden" name="id" value={team.id} />
-                    <button type="submit" className="text-red-600 hover:underline">
-                      Eliminar
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            )
-          )}
-          {(teams ?? []).length === 0 && (
-            <tr>
-              <td colSpan={3} className="py-4 text-neutral-500">
-                No hay equipos todavía.
-              </td>
+      <div className="mt-6 overflow-x-auto rounded-xl border border-neutral-200">
+        <table className="w-full min-w-[500px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-neutral-200 text-left text-neutral-500">
+              <th className="px-3 py-2 font-medium">Nombre</th>
+              <th className="px-3 py-2 font-medium">División</th>
+              <th className="px-3 py-2"></th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {(teams ?? []).map((team) =>
+              edit === team.id ? (
+                <tr key={team.id} className="border-b border-neutral-100">
+                  <td colSpan={3} className="px-3 py-3">
+                    <form action={updateTeam} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={team.id} />
+                      <input
+                        name="name"
+                        defaultValue={team.name}
+                        required
+                        className="rounded-lg border border-neutral-300 px-2 py-1"
+                      />
+                      <select
+                        name="division_id"
+                        defaultValue={team.division_id}
+                        required
+                        className="max-w-full rounded-lg border border-neutral-300 px-2 py-1"
+                      >
+                        {(divisions ?? []).map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-brand-blue px-3 py-1 text-white hover:bg-brand-blue-hover"
+                      >
+                        Guardar
+                      </button>
+                      <a href="/dashboard/admin/teams" className="text-neutral-500 hover:underline">
+                        Cancelar
+                      </a>
+                    </form>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={team.id} className="border-b border-neutral-100">
+                  <td className="px-3 py-2">{team.name}</td>
+                  <td className="px-3 py-2">{team.divisions?.name ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <a href={`/dashboard/team-stats/${team.id}`} className="mr-3 text-brand-blue hover:underline">
+                      Ver estadísticas
+                    </a>
+                    <a
+                      href={`/dashboard/admin/teams?edit=${team.id}`}
+                      className="mr-3 text-brand-blue hover:underline"
+                    >
+                      Editar
+                    </a>
+                    <form action={deleteTeam} className="inline">
+                      <input type="hidden" name="id" value={team.id} />
+                      <button type="submit" className="text-red-600 hover:underline">
+                        Eliminar
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              )
+            )}
+            {(teams ?? []).length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-3 py-4 text-neutral-500">
+                  No hay equipos todavía.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       <h2 className="mt-8 text-sm font-semibold text-neutral-700">
         Crear nuevo equipo

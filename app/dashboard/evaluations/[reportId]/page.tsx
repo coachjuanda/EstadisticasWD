@@ -86,7 +86,7 @@ export default async function EvaluationDetailPage({
   });
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto w-full max-w-3xl p-6">
       <h1 className="text-xl font-semibold text-neutral-900">
         Evaluación técnica — {report.athlete_profiles?.full_name ?? '—'}
       </h1>

@@ -23,7 +23,7 @@ export default async function MatchBoxScorePage({
   const match = result.data;
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
+    <div className="mx-auto w-full max-w-4xl p-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Box score</h1>
         <div className="flex gap-2">

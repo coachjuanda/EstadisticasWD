@@ -38,7 +38,10 @@ function StatCell({
     <div className="flex items-center justify-center gap-1">
       <button
         type="button"
-        onClick={onDecrement}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDecrement();
+        }}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-base font-bold text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300"
       >
         −
@@ -48,7 +51,10 @@ function StatCell({
       </span>
       <button
         type="button"
-        onClick={onIncrement}
+        onClick={(e) => {
+          e.stopPropagation();
+          onIncrement();
+        }}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-orange text-base font-bold text-white hover:bg-brand-orange-hover active:bg-brand-orange-hover"
       >
         +
@@ -77,6 +83,11 @@ export function LiveMatchClient({
   const [players, setPlayers] = useState(initialPlayers);
   const [teamStats, setTeamStats] = useState(initialTeamStats);
   const [finalizing, setFinalizing] = useState(false);
+
+  // Resaltado de fila activa por tabla -- puramente visual, no se persiste.
+  const [highlightedFieldPlayer, setHighlightedFieldPlayer] = useState<string | null>(null);
+  const [highlightedGoalie, setHighlightedGoalie] = useState<string | null>(null);
+  const [teamRowHighlighted, setTeamRowHighlighted] = useState(false);
 
   const bySortOrder = (a: StatDef, b: StatDef) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
   const fieldStatDefs = statDefs
@@ -213,9 +224,19 @@ export function LiveMatchClient({
               </tr>
             </thead>
             <tbody>
-              {fieldPlayers.map((p) => (
-                <tr key={p.matchPlayerStatId} className="border-b border-neutral-100 last:border-0">
-                  <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-medium text-neutral-900">
+              {fieldPlayers.map((p) => {
+                const isHighlighted = highlightedFieldPlayer === p.matchPlayerStatId;
+                return (
+                <tr
+                  key={p.matchPlayerStatId}
+                  onClick={() =>
+                    setHighlightedFieldPlayer((prev) => (prev === p.matchPlayerStatId ? null : p.matchPlayerStatId))
+                  }
+                  className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-brand-orange/10' : ''}`}
+                >
+                  <td
+                    className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                  >
                     #{p.jerseyNumber ?? '—'} {p.fullName}
                   </td>
                   {fieldStatDefs.map((s) => (
@@ -233,7 +254,8 @@ export function LiveMatchClient({
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
               {fieldPlayers.length === 0 && (
                 <tr>
                   <td
@@ -276,10 +298,19 @@ export function LiveMatchClient({
                 const shots = p.stats.shots_received ?? 0;
                 const goalsAgainst = p.stats.goals_received ?? 0;
                 const savePct = shots > 0 ? Math.round(((shots - goalsAgainst) / shots) * 100) : null;
+                const isHighlighted = highlightedGoalie === p.matchPlayerStatId;
 
                 return (
-                  <tr key={p.matchPlayerStatId} className="border-b border-neutral-100 last:border-0">
-                    <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-medium text-neutral-900">
+                  <tr
+                    key={p.matchPlayerStatId}
+                    onClick={() =>
+                      setHighlightedGoalie((prev) => (prev === p.matchPlayerStatId ? null : p.matchPlayerStatId))
+                    }
+                    className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-brand-orange/10' : ''}`}
+                  >
+                    <td
+                      className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                    >
                       #{p.jerseyNumber ?? '—'} {p.fullName}
                     </td>
                     {goalieStatDefs.map((s) => (
@@ -340,8 +371,13 @@ export function LiveMatchClient({
             </thead>
             <tbody>
               {teamStats ? (
-                <tr>
-                  <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 font-medium text-neutral-900">
+                <tr
+                  onClick={() => setTeamRowHighlighted((prev) => !prev)}
+                  className={`cursor-pointer ${teamRowHighlighted ? 'bg-brand-orange/10' : ''}`}
+                >
+                  <td
+                    className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${teamRowHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                  >
                     {homeTeamName}
                   </td>
                   {teamStatDefs.map((s) => (

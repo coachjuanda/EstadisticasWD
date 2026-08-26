@@ -86,7 +86,7 @@ export default async function PublicLiveMatchPage({
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-6">
       <AutoRefresh intervalMs={5000} />
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl">
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="flex justify-center">
             <Image src="/logo-wilddogs.png" alt="Wild Dogs" width={40} height={40} priority />
