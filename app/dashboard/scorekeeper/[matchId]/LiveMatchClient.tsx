@@ -202,10 +202,10 @@ export function LiveMatchClient({
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-neutral-700">Jugadores</h2>
         <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-200">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="border-b border-neutral-200 bg-neutral-50">
-                <th className="sticky left-0 z-10 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
+                <th className="sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
                   Jugador
                 </th>
                 {fieldStatDefs.map((s) => (
@@ -232,10 +232,10 @@ export function LiveMatchClient({
                   onClick={() =>
                     setHighlightedFieldPlayer((prev) => (prev === p.matchPlayerStatId ? null : p.matchPlayerStatId))
                   }
-                  className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-brand-orange/10' : ''}`}
+                  className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-orange-50' : ''}`}
                 >
                   <td
-                    className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                    className={`sticky left-0 z-10 whitespace-nowrap border-r border-neutral-100 px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-orange-50' : 'bg-white'}`}
                   >
                     #{p.jerseyNumber ?? '—'} {p.fullName}
                   </td>
@@ -274,10 +274,10 @@ export function LiveMatchClient({
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-neutral-700">Porteros</h2>
         <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-200">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="border-b border-neutral-200 bg-neutral-50">
-                <th className="sticky left-0 z-10 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
+                <th className="sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
                   Portero
                 </th>
                 {goalieStatDefs.map((s) => (
@@ -306,10 +306,10 @@ export function LiveMatchClient({
                     onClick={() =>
                       setHighlightedGoalie((prev) => (prev === p.matchPlayerStatId ? null : p.matchPlayerStatId))
                     }
-                    className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-brand-orange/10' : ''}`}
+                    className={`cursor-pointer border-b border-neutral-100 last:border-0 ${isHighlighted ? 'bg-orange-50' : ''}`}
                   >
                     <td
-                      className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                      className={`sticky left-0 z-10 whitespace-nowrap border-r border-neutral-100 px-3 py-2 font-medium text-neutral-900 ${isHighlighted ? 'bg-orange-50' : 'bg-white'}`}
                     >
                       #{p.jerseyNumber ?? '—'} {p.fullName}
                     </td>
@@ -343,10 +343,10 @@ export function LiveMatchClient({
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-neutral-700">Estadísticas de equipo</h2>
         <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-200">
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="border-b border-neutral-200 bg-neutral-50">
-                <th className="sticky left-0 z-10 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
+                <th className="sticky left-0 z-10 border-r border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-medium text-neutral-500">
                   Equipo
                 </th>
                 {teamStatDefs.map((s) => (
@@ -373,10 +373,10 @@ export function LiveMatchClient({
               {teamStats ? (
                 <tr
                   onClick={() => setTeamRowHighlighted((prev) => !prev)}
-                  className={`cursor-pointer ${teamRowHighlighted ? 'bg-brand-orange/10' : ''}`}
+                  className={`cursor-pointer ${teamRowHighlighted ? 'bg-orange-50' : ''}`}
                 >
                   <td
-                    className={`sticky left-0 z-10 whitespace-nowrap px-3 py-2 font-medium text-neutral-900 ${teamRowHighlighted ? 'bg-brand-orange/10' : 'bg-white'}`}
+                    className={`sticky left-0 z-10 whitespace-nowrap border-r border-neutral-100 px-3 py-2 font-medium text-neutral-900 ${teamRowHighlighted ? 'bg-orange-50' : 'bg-white'}`}
                   >
                     {homeTeamName}
                   </td>
