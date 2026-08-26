@@ -63,6 +63,8 @@ export async function addRosterPlayer(formData: FormData) {
   }
 
   const supabase = await createClient();
+  const { data: roster } = await supabase.from('rosters').select('team_id').eq('id', roster_id).single();
+
   const { error } = await supabase.from('roster_players').insert({
     roster_id,
     athlete_id,
@@ -71,6 +73,16 @@ export async function addRosterPlayer(formData: FormData) {
 
   if (error) {
     redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent(friendlyError(error))}`);
+  }
+
+  // Alta automática a team_members (membresía vigente para convocatoria a
+  // entrenamientos) -- competir en esta nómina de torneo implica que
+  // también entrena con el equipo. ignoreDuplicates: ya puede estar ahí de
+  // una nómina anterior, no es un error.
+  if (roster?.team_id) {
+    await supabase
+      .from('team_members')
+      .upsert({ team_id: roster.team_id, athlete_id }, { onConflict: 'team_id,athlete_id', ignoreDuplicates: true });
   }
 
   revalidatePath(BASE_PATH);

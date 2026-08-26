@@ -236,10 +236,11 @@ async function getDeletionBlockReasons(
   const reasons: string[] = [];
 
   if (target.role === 'deportista') {
-    const [{ count: statsCount }, { count: evalCount }, { count: surveyCount }] = await Promise.all([
+    const [{ count: statsCount }, { count: evalCount }, { count: surveyCount }, { count: attendanceCount }] = await Promise.all([
       supabase.from('match_player_stats').select('id', { count: 'exact', head: true }).eq('athlete_id', target.id),
       supabase.from('evaluation_reports').select('id', { count: 'exact', head: true }).eq('athlete_id', target.id),
       supabase.from('survey_responses').select('id', { count: 'exact', head: true }).eq('user_id', target.id),
+      supabase.from('training_attendance').select('id', { count: 'exact', head: true }).eq('athlete_id', target.id),
     ]);
     if ((statsCount ?? 0) > 0) {
       reasons.push(`tiene estadísticas registradas en ${statsCount} partido${statsCount === 1 ? '' : 's'}`);
@@ -252,15 +253,21 @@ async function getDeletionBlockReasons(
     if ((surveyCount ?? 0) > 0) {
       reasons.push(`respondió ${surveyCount} encuesta${surveyCount === 1 ? '' : 's'}`);
     }
+    if ((attendanceCount ?? 0) > 0) {
+      reasons.push(`tiene ${attendanceCount} registro${attendanceCount === 1 ? '' : 's'} de asistencia a entrenamientos`);
+    }
   }
 
   if (target.role === 'coach') {
-    const { count } = await supabase
-      .from('evaluation_reports')
-      .select('id', { count: 'exact', head: true })
-      .eq('coach_id', target.id);
+    const [{ count }, { count: sessionsCount }] = await Promise.all([
+      supabase.from('evaluation_reports').select('id', { count: 'exact', head: true }).eq('coach_id', target.id),
+      supabase.from('training_sessions').select('id', { count: 'exact', head: true }).eq('created_by', target.id),
+    ]);
     if ((count ?? 0) > 0) {
       reasons.push(`escribió ${count} evaluación${count === 1 ? '' : 'es'} técnica${count === 1 ? '' : 's'}`);
+    }
+    if ((sessionsCount ?? 0) > 0) {
+      reasons.push(`creó ${sessionsCount} sesión${sessionsCount === 1 ? '' : 'es'} de entrenamiento`);
     }
   }
 
@@ -278,16 +285,24 @@ async function getDeletionBlockReasons(
   }
 
   // Catch-all para cualquier rol: si alguna vez corrigió una estadística
-  // (queda en el historial de auditoría) o creó una plantilla de encuesta.
-  const [{ count: auditCount }, { count: templatesCount }] = await Promise.all([
+  // (queda en el historial de auditoría), creó una plantilla de encuesta, o
+  // creó una sesión de entrenamiento (esto último ya se chequea arriba para
+  // coach, pero un admin también puede crear sesiones).
+  const [{ count: auditCount }, { count: templatesCount }, { count: adminSessionsCount }] = await Promise.all([
     supabase.from('stat_audit_log').select('id', { count: 'exact', head: true }).eq('changed_by', target.id),
     supabase.from('survey_templates').select('id', { count: 'exact', head: true }).eq('created_by', target.id),
+    target.role === 'admin'
+      ? supabase.from('training_sessions').select('id', { count: 'exact', head: true }).eq('created_by', target.id)
+      : Promise.resolve({ count: 0 }),
   ]);
   if ((auditCount ?? 0) > 0) {
     reasons.push('aparece en el historial de auditoría de estadísticas (hizo correcciones registradas)');
   }
   if ((templatesCount ?? 0) > 0) {
     reasons.push(`creó ${templatesCount} plantilla${templatesCount === 1 ? '' : 's'} de encuesta`);
+  }
+  if ((adminSessionsCount ?? 0) > 0) {
+    reasons.push(`creó ${adminSessionsCount} sesión${adminSessionsCount === 1 ? '' : 'es'} de entrenamiento`);
   }
 
   return reasons;

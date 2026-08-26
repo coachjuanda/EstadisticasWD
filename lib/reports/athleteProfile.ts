@@ -17,6 +17,13 @@ type StatDefRow = {
 
 export type AthleteStatCard = { key: string; label: string; value: number | string };
 
+export type AthleteTrainingSession = {
+  id: string;
+  scheduledAt: string;
+  divisionNames: string;
+  present: boolean;
+};
+
 export type AthleteProfileData = {
   athleteId: string;
   fullName: string;
@@ -28,6 +35,10 @@ export type AthleteProfileData = {
   matchesInScope: number;
   statCards: AthleteStatCard[];
   teamMemberships: { rosterId: string; teamId: string; tournamentId: string; teamName: string; tournamentName: string }[];
+  attendancePct: number | null;
+  attendanceTotal: number;
+  attendancePresent: number;
+  recentTrainingSessions: AthleteTrainingSession[];
 };
 
 export async function loadAthleteProfile(
@@ -145,6 +156,44 @@ export async function loadAthleteProfile(
     statCards.push({ key: 'save_pct', label: 'SV%', value: savePct !== null ? `${savePct}%` : '—' });
   }
 
+  // Asistencia a entrenamientos -- independiente de torneo/temporada (no se
+  // filtra por tournamentFilter, a diferencia de las stats de partido).
+  // % = presentes / total de filas (cada fila = convocado a esa sesión).
+  const { data: attendanceRows } = await supabase
+    .from('training_attendance')
+    .select(
+      'id, present, training_sessions(scheduled_at, training_session_divisions(divisions(name)))'
+    )
+    .eq('athlete_id', athleteId)
+    .returns<
+      {
+        id: string;
+        present: boolean;
+        training_sessions: {
+          scheduled_at: string;
+          training_session_divisions: { divisions: { name: string } | null }[];
+        } | null;
+      }[]
+    >();
+
+  const attendance = (attendanceRows ?? []).filter((r) => r.training_sessions !== null);
+  const attendanceTotal = attendance.length;
+  const attendancePresent = attendance.filter((r) => r.present).length;
+  const attendancePct = attendanceTotal > 0 ? Math.round((attendancePresent / attendanceTotal) * 100) : null;
+
+  const recentTrainingSessions: AthleteTrainingSession[] = attendance
+    .map((r) => ({
+      id: r.id,
+      scheduledAt: r.training_sessions!.scheduled_at,
+      divisionNames: r.training_sessions!.training_session_divisions
+        .map((d) => d.divisions?.name)
+        .filter(Boolean)
+        .join(', '),
+      present: r.present,
+    }))
+    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt))
+    .slice(0, 10);
+
   return {
     ok: true,
     data: {
@@ -166,6 +215,10 @@ export async function loadAthleteProfile(
         teamName: m.teams?.name ?? '—',
         tournamentName: m.tournaments?.name ?? '—',
       })),
+      attendancePct,
+      attendanceTotal,
+      attendancePresent,
+      recentTrainingSessions,
     },
   };
 }

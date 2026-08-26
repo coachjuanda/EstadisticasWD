@@ -72,6 +72,12 @@ export default async function DashboardPage({
             >
               Mis equipos y partidos
             </Link>
+            <Link
+              href="/dashboard/coach/training"
+              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
+            >
+              Entrenamientos
+            </Link>
           </div>
         )}
         {profile?.role === 'deportista' && (
