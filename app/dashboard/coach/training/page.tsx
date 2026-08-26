@@ -12,9 +12,9 @@ type SessionRow = {
 export default async function CoachTrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; created?: string; saved?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, created, saved } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -44,6 +44,12 @@ export default async function CoachTrainingPage({
 
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+      {created === '1' && (
+        <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Sesión creada correctamente.</p>
+      )}
+      {saved === '1' && (
+        <p className="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">Asistencia actualizada.</p>
       )}
 
       <div className="mt-6 flex flex-col gap-3">

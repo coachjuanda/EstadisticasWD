@@ -57,7 +57,7 @@ export async function createTrainingSessionAction(
 
   const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
 
-  const { data: sessionId, error } = await supabase.rpc('create_training_session', {
+  const { error } = await supabase.rpc('create_training_session', {
     p_scheduled_at: scheduledAt,
     p_location: location || null,
     p_division_ids: divisionIds,
@@ -69,7 +69,7 @@ export async function createTrainingSessionAction(
   }
 
   revalidatePath(BASE_PATH);
-  redirect(`${BASE_PATH}/${sessionId}`);
+  redirect(`${BASE_PATH}?created=1`);
 }
 
 export type UpdateAttendanceState =
@@ -105,5 +105,5 @@ export async function updateTrainingAttendanceAction(
 
   revalidatePath(`${BASE_PATH}/${sessionId}`);
   revalidatePath(BASE_PATH);
-  redirect(`${BASE_PATH}/${sessionId}?saved=1`);
+  redirect(`${BASE_PATH}?saved=1`);
 }
