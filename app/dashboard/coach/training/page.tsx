@@ -86,6 +86,10 @@ export default async function CoachTrainingPage({
           <p className="text-sm text-neutral-500">Aún no has registrado sesiones de entrenamiento.</p>
         )}
       </div>
+
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

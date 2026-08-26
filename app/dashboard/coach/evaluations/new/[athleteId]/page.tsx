@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createEvaluation } from '../../actions';
 import { EvaluationForm } from '../../EvaluationForm';
@@ -40,6 +41,9 @@ export default async function NewEvaluationPage({
         hiddenFields={{ athlete_id: athleteId, division_id: division_id ?? '' }}
         submitLabel="Guardar evaluación"
       />
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

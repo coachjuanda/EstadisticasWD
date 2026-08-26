@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 
 type TemplateRow = { id: string; title: string; target: string };
@@ -57,6 +58,10 @@ export default async function AthleteSurveysPage() {
           <p className="text-sm text-neutral-500">No hay encuestas disponibles.</p>
         )}
       </div>
+
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

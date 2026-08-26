@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 
 type ReportRow = {
@@ -61,6 +62,10 @@ export default async function AthleteEvaluationsPage() {
           </p>
         )}
       </div>
+
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

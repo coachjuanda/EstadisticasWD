@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { updateEvaluation } from '../../actions';
@@ -64,6 +65,9 @@ export default async function EditEvaluationPage({
         existingDofa={existingDofa}
         submitLabel="Guardar cambios"
       />
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { NewTrainingSessionForm } from './NewTrainingSessionForm';
 
@@ -53,6 +54,9 @@ export default async function NewTrainingSessionPage() {
   return (
     <div className="mx-auto max-w-2xl p-6">
       <NewTrainingSessionForm divisions={divisionOptions} />
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }

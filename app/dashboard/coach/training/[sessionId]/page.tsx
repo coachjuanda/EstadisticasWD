@@ -73,6 +73,10 @@ export default async function TrainingSessionPage({
       <div className="mt-6">
         <EditAttendanceForm key={attendanceKey} sessionId={session.id} athletes={athletes} />
       </div>
+
+      <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
+        ← Volver
+      </Link>
     </div>
   );
 }
