@@ -1,37 +1,36 @@
+import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { loadAthleteTrainingAttendance, loadCoachTrainingAttendance } from '@/lib/reports/trainingAttendance';
 
 type DivisionOption = { id: string; name: string };
 type PersonOption = { id: string; full_name: string };
 
-type SessionRow = {
-  id: string;
-  scheduled_at: string;
-  training_session_divisions: { division_id: string; divisions: { name: string } | null }[];
-};
+function toArray(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
 
-type AttendanceRow = {
-  id: string;
-  athlete_id: string;
-  training_session_id: string;
-  present: boolean;
-  athlete_profiles: { full_name: string } | null;
-};
-
-type CoachAttendanceRow = {
-  coach_id: string;
-  training_session_id: string;
-  profiles: { full_name: string } | null;
-  training_sessions: {
-    scheduled_at: string;
-    training_session_divisions: { divisions: { name: string } | null }[];
-  } | null;
-};
+function buildQuery(parts: {
+  divisionIds?: string[];
+  date_from?: string;
+  date_to?: string;
+  athlete_id?: string;
+  coach_id?: string;
+}) {
+  const qs = new URLSearchParams();
+  for (const d of parts.divisionIds ?? []) qs.append('division_id', d);
+  if (parts.date_from) qs.set('date_from', parts.date_from);
+  if (parts.date_to) qs.set('date_to', parts.date_to);
+  if (parts.athlete_id) qs.set('athlete_id', parts.athlete_id);
+  if (parts.coach_id) qs.set('coach_id', parts.coach_id);
+  return qs.toString();
+}
 
 export default async function AdminTrainingPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    division_id?: string;
+    division_id?: string | string[];
     date_from?: string;
     date_to?: string;
     athlete_id?: string;
@@ -39,9 +38,10 @@ export default async function AdminTrainingPage({
   }>;
 }) {
   const { division_id, date_from, date_to, athlete_id, coach_id } = await searchParams;
+  const divisionIds = toArray(division_id);
   const supabase = await createClient();
 
-  const [{ data: divisions }, { data: athletes }] = await Promise.all([
+  const [{ data: divisions }, { data: athletes }, athleteResult, coachResult] = await Promise.all([
     supabase.from('divisions').select('id, name').order('name').returns<DivisionOption[]>(),
     supabase
       .from('profiles')
@@ -49,133 +49,45 @@ export default async function AdminTrainingPage({
       .eq('role', 'deportista')
       .order('full_name')
       .returns<PersonOption[]>(),
+    loadAthleteTrainingAttendance(supabase, { divisionIds, dateFrom: date_from, dateTo: date_to, athleteId: athlete_id }),
+    loadCoachTrainingAttendance(supabase, { dateFrom: date_from, dateTo: date_to, coachId: coach_id }),
   ]);
 
-  let sessionsQuery = supabase
-    .from('training_sessions')
-    .select('id, scheduled_at, training_session_divisions(division_id, divisions(name))');
+  if (!athleteResult.ok || !coachResult.ok) redirect('/dashboard?error=unauthorized');
 
-  if (date_from) sessionsQuery = sessionsQuery.gte('scheduled_at', `${date_from}T00:00:00`);
-  if (date_to) sessionsQuery = sessionsQuery.lte('scheduled_at', `${date_to}T23:59:59`);
+  const { summary, detail } = athleteResult.data;
+  const { summary: coachSummary, detail: coachDetail } = coachResult.data;
 
-  const { data: sessionsData } = await sessionsQuery.returns<SessionRow[]>();
+  const hasFilters = Boolean(divisionIds.length > 0 || date_from || date_to || athlete_id);
 
-  let sessions = sessionsData ?? [];
-  if (division_id) {
-    sessions = sessions.filter((s) => s.training_session_divisions.some((d) => d.division_id === division_id));
-  }
-  const sessionById = new Map(sessions.map((s) => [s.id, s]));
-  const sessionIds = sessions.map((s) => s.id);
-
-  let attendanceRows: AttendanceRow[] = [];
-  if (sessionIds.length > 0) {
-    let attendanceQuery = supabase
-      .from('training_attendance')
-      .select('id, athlete_id, training_session_id, present, athlete_profiles(full_name)')
-      .in('training_session_id', sessionIds);
-
-    if (athlete_id) attendanceQuery = attendanceQuery.eq('athlete_id', athlete_id);
-
-    const { data } = await attendanceQuery.returns<AttendanceRow[]>();
-    attendanceRows = data ?? [];
-  }
-
-  type AthleteAgg = { athleteId: string; fullName: string; total: number; present: number };
-  const aggMap = new Map<string, AthleteAgg>();
-  for (const row of attendanceRows) {
-    if (!aggMap.has(row.athlete_id)) {
-      aggMap.set(row.athlete_id, {
-        athleteId: row.athlete_id,
-        fullName: row.athlete_profiles?.full_name ?? '—',
-        total: 0,
-        present: 0,
-      });
-    }
-    const agg = aggMap.get(row.athlete_id)!;
-    agg.total += 1;
-    if (row.present) agg.present += 1;
-  }
-  const summary = [...aggMap.values()]
-    .map((a) => ({ ...a, pct: a.total > 0 ? Math.round((a.present / a.total) * 100) : 0 }))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName));
-
-  const detail = attendanceRows
-    .map((row) => {
-      const session = sessionById.get(row.training_session_id);
-      return {
-        id: row.id,
-        scheduledAt: session?.scheduled_at ?? '',
-        divisionNames: (session?.training_session_divisions ?? [])
-          .map((d) => d.divisions?.name)
-          .filter(Boolean)
-          .join(', '),
-        present: row.present,
-      };
-    })
-    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
-
-  // Conteo de presencia de entrenadores -- sin filtros de división/fecha
-  // (a propósito, es un panel aparte e independiente del de deportistas) y
-  // sin porcentaje: training_session_coaches no tiene concepto de
-  // "convocado", así que no hay denominador contra el cual calcular uno.
-  const { data: coachAttendanceRows } = await supabase
-    .from('training_session_coaches')
-    .select('coach_id, training_session_id, profiles(full_name), training_sessions(scheduled_at, training_session_divisions(divisions(name)))')
-    .returns<CoachAttendanceRow[]>();
-
-  type CoachAgg = { coachId: string; fullName: string; sessionsPresent: number };
-  const coachAggMap = new Map<string, CoachAgg>();
-  for (const row of coachAttendanceRows ?? []) {
-    if (!coachAggMap.has(row.coach_id)) {
-      coachAggMap.set(row.coach_id, {
-        coachId: row.coach_id,
-        fullName: row.profiles?.full_name ?? '—',
-        sessionsPresent: 0,
-      });
-    }
-    coachAggMap.get(row.coach_id)!.sessionsPresent += 1;
-  }
-  const coachSummary = [...coachAggMap.values()].sort((a, b) => b.sessionsPresent - a.sessionsPresent);
-
-  // Detalle de sesiones de un entrenador puntual -- misma data ya traída
-  // arriba, solo se filtra y se re-mapea a fecha + divisiones, sin necesitar
-  // una segunda consulta.
-  const coachDetail = (coachAttendanceRows ?? [])
-    .filter((row) => row.coach_id === coach_id)
-    .map((row) => ({
-      id: row.training_session_id,
-      scheduledAt: row.training_sessions?.scheduled_at ?? '',
-      divisionNames: (row.training_sessions?.training_session_divisions ?? [])
-        .map((d) => d.divisions?.name)
-        .filter(Boolean)
-        .join(', '),
-    }))
-    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
-
-  const hasFilters = Boolean(division_id || date_from || date_to || athlete_id);
+  const athletesExportQuery = buildQuery({ divisionIds, date_from, date_to, athlete_id });
+  const coachesExportQuery = buildQuery({ date_from, date_to, coach_id });
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-semibold text-neutral-900">Asistencia a entrenamientos</h1>
 
-      <form method="GET" className="mt-4 flex flex-wrap items-end gap-2">
+      <form method="GET" className="mt-4 flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-neutral-500" htmlFor="filter-division">
-            División
-          </label>
-          <select
-            id="filter-division"
-            name="division_id"
-            defaultValue={division_id ?? ''}
-            className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-          >
-            <option value="">Todas</option>
+          <span className="text-xs text-neutral-500">División</span>
+          <div className="flex max-w-xs flex-wrap gap-1.5">
             {(divisions ?? []).map((d) => (
-              <option key={d.id} value={d.id}>
+              <label
+                key={d.id}
+                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1 text-xs text-neutral-700"
+              >
+                <input
+                  type="checkbox"
+                  name="division_id"
+                  value={d.id}
+                  defaultChecked={divisionIds.includes(d.id)}
+                  className="h-3.5 w-3.5"
+                />
                 {d.name}
-              </option>
+              </label>
             ))}
-          </select>
+            {(divisions ?? []).length === 0 && <span className="text-xs text-neutral-400">Sin divisiones</span>}
+          </div>
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-neutral-500" htmlFor="filter-date-from">
@@ -231,12 +143,37 @@ export default async function AdminTrainingPage({
           </a>
         )}
       </form>
+      <p className="mt-2 text-xs text-neutral-400">
+        El rango de fechas (Desde/Hasta) aplica tanto a Deportistas como a Entrenadores. La división solo filtra la tabla
+        de deportistas.
+      </p>
+
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-neutral-700">Deportistas</h2>
+        <div className="flex shrink-0 gap-2">
+          <a
+            href={`/api/reports/training-attendance/athletes/pdf${athletesExportQuery ? `?${athletesExportQuery}` : ''}`}
+            className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            PDF
+          </a>
+          <a
+            href={`/api/reports/training-attendance/athletes/excel${athletesExportQuery ? `?${athletesExportQuery}` : ''}`}
+            className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            Excel
+          </a>
+        </div>
+      </div>
 
       {athlete_id ? (
-        <div className="mt-6">
-          <h2 className="text-sm font-semibold text-neutral-700">
+        <div className="mt-3">
+          <a href={`/dashboard/admin/training?${buildQuery({ divisionIds, date_from, date_to })}`} className="text-sm text-neutral-500 hover:underline">
+            ← Volver al resumen de deportistas
+          </a>
+          <h3 className="mt-2 text-sm font-semibold text-neutral-700">
             {athletes?.find((a) => a.id === athlete_id)?.full_name ?? 'Deportista'} — {detail.length > 0 ? Math.round((detail.filter((d) => d.present).length / detail.length) * 100) : 0}% de asistencia
-          </h2>
+          </h3>
           <div className="mt-3 flex flex-col gap-2">
             {detail.map((d) => (
               <div
@@ -258,7 +195,7 @@ export default async function AdminTrainingPage({
           </div>
         </div>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-neutral-200">
+        <div className="mt-3 overflow-x-auto rounded-xl border border-neutral-200">
           <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left text-neutral-500">
@@ -273,12 +210,7 @@ export default async function AdminTrainingPage({
                 <tr key={a.athleteId} className="border-b border-neutral-100">
                   <td className="px-3 py-2">
                     <a
-                      href={`/dashboard/admin/training?${new URLSearchParams({
-                        ...(division_id ? { division_id } : {}),
-                        ...(date_from ? { date_from } : {}),
-                        ...(date_to ? { date_to } : {}),
-                        athlete_id: a.athleteId,
-                      }).toString()}`}
+                      href={`/dashboard/admin/training?${buildQuery({ divisionIds, date_from, date_to, athlete_id: a.athleteId })}`}
                       className="text-brand-blue hover:underline"
                     >
                       {a.fullName}
@@ -297,7 +229,23 @@ export default async function AdminTrainingPage({
         <p className="mt-4 text-sm text-neutral-500">No hay convocatorias con ese filtro.</p>
       )}
 
-      <h2 className="mt-10 text-lg font-semibold text-neutral-900">Asistencia de entrenadores</h2>
+      <div className="mt-10 flex items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold text-neutral-900">Asistencia de entrenadores</h2>
+        <div className="flex shrink-0 gap-2">
+          <a
+            href={`/api/reports/training-attendance/coaches/pdf${coachesExportQuery ? `?${coachesExportQuery}` : ''}`}
+            className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            PDF
+          </a>
+          <a
+            href={`/api/reports/training-attendance/coaches/excel${coachesExportQuery ? `?${coachesExportQuery}` : ''}`}
+            className="rounded-lg border border-neutral-300 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+          >
+            Excel
+          </a>
+        </div>
+      </div>
       <p className="mt-1 text-sm text-neutral-500">
         Sesiones en las que cada entrenador estuvo presente (conteo total, sin comparar contra convocatorias).
       </p>
@@ -305,7 +253,7 @@ export default async function AdminTrainingPage({
       {coach_id ? (
         <div className="mt-4">
           <a
-            href="/dashboard/admin/training"
+            href={`/dashboard/admin/training?${buildQuery({ date_from, date_to })}`}
             className="text-sm text-neutral-500 hover:underline"
           >
             ← Volver al resumen de entrenadores
@@ -328,7 +276,7 @@ export default async function AdminTrainingPage({
               </div>
             ))}
             {coachDetail.length === 0 && (
-              <p className="text-sm text-neutral-500">Este entrenador no tiene sesiones registradas.</p>
+              <p className="text-sm text-neutral-500">Este entrenador no tiene sesiones registradas con ese filtro.</p>
             )}
           </div>
         </div>
@@ -346,7 +294,7 @@ export default async function AdminTrainingPage({
                 <tr key={c.coachId} className="border-b border-neutral-100">
                   <td className="px-3 py-2">
                     <a
-                      href={`/dashboard/admin/training?coach_id=${c.coachId}`}
+                      href={`/dashboard/admin/training?${buildQuery({ date_from, date_to, coach_id: c.coachId })}`}
                       className="text-brand-blue hover:underline"
                     >
                       {c.fullName}
@@ -360,7 +308,7 @@ export default async function AdminTrainingPage({
         </div>
       )}
       {!coach_id && coachSummary.length === 0 && (
-        <p className="mt-4 text-sm text-neutral-500">Aún no hay entrenadores marcados como presentes en ninguna sesión.</p>
+        <p className="mt-4 text-sm text-neutral-500">Aún no hay entrenadores marcados como presentes con ese filtro.</p>
       )}
     </div>
   );

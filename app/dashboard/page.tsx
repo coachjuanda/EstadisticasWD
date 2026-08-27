@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { InstallAppCard } from './InstallAppCard';
 
 export default async function DashboardPage({
   searchParams,
@@ -108,6 +109,7 @@ export default async function DashboardPage({
             </Link>
           </div>
         )}
+        <InstallAppCard />
       </div>
     </main>
   );
