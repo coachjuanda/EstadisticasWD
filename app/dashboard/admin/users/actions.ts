@@ -259,15 +259,19 @@ async function getDeletionBlockReasons(
   }
 
   if (target.role === 'coach') {
-    const [{ count }, { count: sessionsCount }] = await Promise.all([
+    const [{ count }, { count: sessionsCount }, { count: presentCount }] = await Promise.all([
       supabase.from('evaluation_reports').select('id', { count: 'exact', head: true }).eq('coach_id', target.id),
       supabase.from('training_sessions').select('id', { count: 'exact', head: true }).eq('created_by', target.id),
+      supabase.from('training_session_coaches').select('training_session_id', { count: 'exact', head: true }).eq('coach_id', target.id),
     ]);
     if ((count ?? 0) > 0) {
       reasons.push(`escribió ${count} evaluación${count === 1 ? '' : 'es'} técnica${count === 1 ? '' : 's'}`);
     }
     if ((sessionsCount ?? 0) > 0) {
       reasons.push(`creó ${sessionsCount} sesión${sessionsCount === 1 ? '' : 'es'} de entrenamiento`);
+    }
+    if ((presentCount ?? 0) > 0) {
+      reasons.push(`quedó registrado como presente en ${presentCount} sesión${presentCount === 1 ? '' : 'es'} de entrenamiento`);
     }
   }
 

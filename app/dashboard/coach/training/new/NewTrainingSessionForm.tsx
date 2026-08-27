@@ -5,13 +5,15 @@ import { createTrainingSessionAction, type CreateTrainingSessionState } from '..
 
 type Athlete = { id: string; full_name: string };
 type Division = { id: string; name: string; athletes: Athlete[] };
+type Coach = { id: string; full_name: string };
 
 const initialState: CreateTrainingSessionState = { status: 'idle' };
 
-export function NewTrainingSessionForm({ divisions }: { divisions: Division[] }) {
+export function NewTrainingSessionForm({ divisions, coaches }: { divisions: Division[]; coaches: Coach[] }) {
   const [state, formAction, pending] = useActionState(createTrainingSessionAction, initialState);
   const [selectedDivisionIds, setSelectedDivisionIds] = useState<string[]>([]);
   const [presentMap, setPresentMap] = useState<Record<string, boolean>>({});
+  const [presentCoachIds, setPresentCoachIds] = useState<string[]>([]);
 
   const convocados = useMemo(() => {
     const seen = new Map<string, Athlete>();
@@ -42,6 +44,12 @@ export function NewTrainingSessionForm({ divisions }: { divisions: Division[] })
     setPresentMap((prev) => ({ ...prev, [athleteId]: !prev[athleteId] }));
   }
 
+  function toggleCoach(coachId: string) {
+    setPresentCoachIds((prev) =>
+      prev.includes(coachId) ? prev.filter((id) => id !== coachId) : [...prev, coachId]
+    );
+  }
+
   const attendancePayload = convocados.map((a) => ({ athlete_id: a.id, present: !!presentMap[a.id] }));
   const presentCount = attendancePayload.filter((a) => a.present).length;
 
@@ -49,6 +57,7 @@ export function NewTrainingSessionForm({ divisions }: { divisions: Division[] })
     <form action={formAction} className="flex flex-col gap-6">
       <input type="hidden" name="division_ids" value={JSON.stringify(selectedDivisionIds)} />
       <input type="hidden" name="attendance" value={JSON.stringify(attendancePayload)} />
+      <input type="hidden" name="coach_ids" value={JSON.stringify(presentCoachIds)} />
 
       <h1 className="text-xl font-semibold text-neutral-900">Nueva sesión de entrenamiento</h1>
 
@@ -117,6 +126,29 @@ export function NewTrainingSessionForm({ divisions }: { divisions: Division[] })
           ))}
           {divisions.length === 0 && (
             <p className="text-sm text-neutral-500">No hay divisiones con deportistas asociados.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-neutral-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-neutral-700">Entrenadores presentes</h2>
+        <div className="mt-3 flex flex-col gap-2">
+          {coaches.map((c) => (
+            <label
+              key={c.id}
+              className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2.5 text-sm"
+            >
+              <span className="text-neutral-800">{c.full_name}</span>
+              <input
+                type="checkbox"
+                checked={presentCoachIds.includes(c.id)}
+                onChange={() => toggleCoach(c.id)}
+                className="h-5 w-5"
+              />
+            </label>
+          ))}
+          {coaches.length === 0 && (
+            <p className="text-sm text-neutral-500">No hay entrenadores activos en el club.</p>
           )}
         </div>
       </section>

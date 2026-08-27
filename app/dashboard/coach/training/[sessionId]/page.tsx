@@ -17,6 +17,9 @@ type AttendanceRow = {
   athlete_profiles: { full_name: string } | null;
 };
 
+type CoachOptionRow = { id: string; full_name: string };
+type SessionCoachRow = { coach_id: string };
+
 export default async function TrainingSessionPage({
   params,
 }: {
@@ -35,15 +38,26 @@ export default async function TrainingSessionPage({
     notFound();
   }
 
-  const { data: attendance } = await supabase
-    .from('training_attendance')
-    .select('id, athlete_id, present, athlete_profiles(full_name)')
-    .eq('training_session_id', sessionId)
-    .returns<AttendanceRow[]>();
+  const [{ data: attendance }, { data: coachOptions }, { data: sessionCoaches }] = await Promise.all([
+    supabase
+      .from('training_attendance')
+      .select('id, athlete_id, present, athlete_profiles(full_name)')
+      .eq('training_session_id', sessionId)
+      .returns<AttendanceRow[]>(),
+    supabase.from('active_coach_options').select('id, full_name').order('full_name').returns<CoachOptionRow[]>(),
+    supabase
+      .from('training_session_coaches')
+      .select('coach_id')
+      .eq('training_session_id', sessionId)
+      .returns<SessionCoachRow[]>(),
+  ]);
 
   const athletes = (attendance ?? [])
     .map((a) => ({ id: a.id, full_name: a.athlete_profiles?.full_name ?? '—', present: a.present }))
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
+
+  const presentCoachIds = new Set((sessionCoaches ?? []).map((c) => c.coach_id));
+  const coaches = (coachOptions ?? []).map((c) => ({ id: c.id, full_name: c.full_name, present: presentCoachIds.has(c.id) }));
 
   const divisionNames = session.training_session_divisions
     .map((d) => d.divisions?.name)
@@ -56,7 +70,10 @@ export default async function TrainingSessionPage({
   // cada vez que los datos guardados cambian -- sin esto, el reset nativo
   // del <form> que dispara un server action en React 19 desincroniza el
   // checkbox recién tocado del checked real en el DOM tras guardar.
-  const attendanceKey = athletes.map((a) => `${a.id}:${a.present}`).join('|');
+  const attendanceKey = [
+    ...athletes.map((a) => `${a.id}:${a.present}`),
+    ...coaches.map((c) => `${c.id}:${c.present}`),
+  ].join('|');
 
   return (
     <div className="mx-auto max-w-2xl p-6">
@@ -71,7 +88,7 @@ export default async function TrainingSessionPage({
       {session.location && <p className="text-sm text-neutral-500">{session.location}</p>}
 
       <div className="mt-6">
-        <EditAttendanceForm key={attendanceKey} sessionId={session.id} athletes={athletes} />
+        <EditAttendanceForm key={attendanceKey} sessionId={session.id} athletes={athletes} coaches={coaches} />
       </div>
 
       <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">

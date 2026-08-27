@@ -17,12 +17,28 @@ type AttendanceRow = {
   athlete_profiles: { full_name: string } | null;
 };
 
+type CoachAttendanceRow = {
+  coach_id: string;
+  training_session_id: string;
+  profiles: { full_name: string } | null;
+  training_sessions: {
+    scheduled_at: string;
+    training_session_divisions: { divisions: { name: string } | null }[];
+  } | null;
+};
+
 export default async function AdminTrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ division_id?: string; date_from?: string; date_to?: string; athlete_id?: string }>;
+  searchParams: Promise<{
+    division_id?: string;
+    date_from?: string;
+    date_to?: string;
+    athlete_id?: string;
+    coach_id?: string;
+  }>;
 }) {
-  const { division_id, date_from, date_to, athlete_id } = await searchParams;
+  const { division_id, date_from, date_to, athlete_id, coach_id } = await searchParams;
   const supabase = await createClient();
 
   const [{ data: divisions }, { data: athletes }] = await Promise.all([
@@ -96,6 +112,44 @@ export default async function AdminTrainingPage({
         present: row.present,
       };
     })
+    .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
+
+  // Conteo de presencia de entrenadores -- sin filtros de división/fecha
+  // (a propósito, es un panel aparte e independiente del de deportistas) y
+  // sin porcentaje: training_session_coaches no tiene concepto de
+  // "convocado", así que no hay denominador contra el cual calcular uno.
+  const { data: coachAttendanceRows } = await supabase
+    .from('training_session_coaches')
+    .select('coach_id, training_session_id, profiles(full_name), training_sessions(scheduled_at, training_session_divisions(divisions(name)))')
+    .returns<CoachAttendanceRow[]>();
+
+  type CoachAgg = { coachId: string; fullName: string; sessionsPresent: number };
+  const coachAggMap = new Map<string, CoachAgg>();
+  for (const row of coachAttendanceRows ?? []) {
+    if (!coachAggMap.has(row.coach_id)) {
+      coachAggMap.set(row.coach_id, {
+        coachId: row.coach_id,
+        fullName: row.profiles?.full_name ?? '—',
+        sessionsPresent: 0,
+      });
+    }
+    coachAggMap.get(row.coach_id)!.sessionsPresent += 1;
+  }
+  const coachSummary = [...coachAggMap.values()].sort((a, b) => b.sessionsPresent - a.sessionsPresent);
+
+  // Detalle de sesiones de un entrenador puntual -- misma data ya traída
+  // arriba, solo se filtra y se re-mapea a fecha + divisiones, sin necesitar
+  // una segunda consulta.
+  const coachDetail = (coachAttendanceRows ?? [])
+    .filter((row) => row.coach_id === coach_id)
+    .map((row) => ({
+      id: row.training_session_id,
+      scheduledAt: row.training_sessions?.scheduled_at ?? '',
+      divisionNames: (row.training_sessions?.training_session_divisions ?? [])
+        .map((d) => d.divisions?.name)
+        .filter(Boolean)
+        .join(', '),
+    }))
     .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
 
   const hasFilters = Boolean(division_id || date_from || date_to || athlete_id);
@@ -241,6 +295,72 @@ export default async function AdminTrainingPage({
       )}
       {!athlete_id && summary.length === 0 && (
         <p className="mt-4 text-sm text-neutral-500">No hay convocatorias con ese filtro.</p>
+      )}
+
+      <h2 className="mt-10 text-lg font-semibold text-neutral-900">Asistencia de entrenadores</h2>
+      <p className="mt-1 text-sm text-neutral-500">
+        Sesiones en las que cada entrenador estuvo presente (conteo total, sin comparar contra convocatorias).
+      </p>
+
+      {coach_id ? (
+        <div className="mt-4">
+          <a
+            href="/dashboard/admin/training"
+            className="text-sm text-neutral-500 hover:underline"
+          >
+            ← Volver al resumen de entrenadores
+          </a>
+          <h3 className="mt-2 text-sm font-semibold text-neutral-700">
+            {coachSummary.find((c) => c.coachId === coach_id)?.fullName ?? 'Entrenador'} — {coachDetail.length} sesión{coachDetail.length === 1 ? '' : 'es'}
+          </h3>
+          <div className="mt-3 flex flex-col gap-2">
+            {coachDetail.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center justify-between rounded-xl border border-neutral-200 p-3 text-sm"
+              >
+                <span className="text-neutral-700">
+                  {d.scheduledAt
+                    ? new Date(d.scheduledAt).toLocaleDateString('es-CO', { dateStyle: 'long' })
+                    : '—'}
+                  {d.divisionNames && ` · ${d.divisionNames}`}
+                </span>
+              </div>
+            ))}
+            {coachDetail.length === 0 && (
+              <p className="text-sm text-neutral-500">Este entrenador no tiene sesiones registradas.</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-200">
+          <table className="w-full min-w-[320px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-neutral-500">
+                <th className="px-3 py-2 font-medium">Entrenador</th>
+                <th className="px-3 py-2 text-right font-medium">Sesiones presente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coachSummary.map((c) => (
+                <tr key={c.coachId} className="border-b border-neutral-100">
+                  <td className="px-3 py-2">
+                    <a
+                      href={`/dashboard/admin/training?coach_id=${c.coachId}`}
+                      className="text-brand-blue hover:underline"
+                    >
+                      {c.fullName}
+                    </a>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold">{c.sessionsPresent}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!coach_id && coachSummary.length === 0 && (
+        <p className="mt-4 text-sm text-neutral-500">Aún no hay entrenadores marcados como presentes en ninguna sesión.</p>
       )}
     </div>
   );

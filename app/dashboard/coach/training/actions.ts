@@ -34,6 +34,7 @@ export async function createTrainingSessionAction(
   const location = (formData.get('location') as string)?.trim();
   const divisionIdsRaw = formData.get('division_ids') as string;
   const attendanceRaw = formData.get('attendance') as string;
+  const coachIdsRaw = formData.get('coach_ids') as string;
 
   if (!scheduledDate || !scheduledTime) {
     return { status: 'error', message: 'Fecha y hora son obligatorias.' };
@@ -41,9 +42,11 @@ export async function createTrainingSessionAction(
 
   let divisionIds: string[] = [];
   let attendance: { athlete_id: string; present: boolean }[] = [];
+  let coachIds: string[] = [];
   try {
     divisionIds = JSON.parse(divisionIdsRaw || '[]');
     attendance = JSON.parse(attendanceRaw || '[]');
+    coachIds = JSON.parse(coachIdsRaw || '[]');
   } catch {
     return { status: 'error', message: 'Datos de formulario inválidos.' };
   }
@@ -62,6 +65,7 @@ export async function createTrainingSessionAction(
     p_location: location || null,
     p_division_ids: divisionIds,
     p_attendance: attendance,
+    p_coach_ids: coachIds,
   });
 
   if (error) {
@@ -84,10 +88,13 @@ export async function updateTrainingAttendanceAction(
 
   const sessionId = formData.get('session_id') as string;
   const attendanceRaw = formData.get('attendance') as string;
+  const coachIdsRaw = formData.get('coach_ids') as string;
 
   let attendance: { id: string; present: boolean }[] = [];
+  let coachIds: string[] = [];
   try {
     attendance = JSON.parse(attendanceRaw || '[]');
+    coachIds = JSON.parse(coachIdsRaw || '[]');
   } catch {
     return { status: 'error', message: 'Datos de formulario inválidos.' };
   }
@@ -100,6 +107,29 @@ export async function updateTrainingAttendanceAction(
 
     if (error) {
       return { status: 'error', message: error.message };
+    }
+  }
+
+  // Sin columna "present" en training_session_coaches (ver migración): se
+  // reemplaza el set completo -- borrar todo y volver a insertar los
+  // marcados es más simple que calcular el diff, y el volumen por sesión es
+  // trivial (unos pocos entrenadores).
+  const { error: deleteCoachesError } = await supabase
+    .from('training_session_coaches')
+    .delete()
+    .eq('training_session_id', sessionId);
+
+  if (deleteCoachesError) {
+    return { status: 'error', message: deleteCoachesError.message };
+  }
+
+  if (coachIds.length > 0) {
+    const { error: insertCoachesError } = await supabase
+      .from('training_session_coaches')
+      .insert(coachIds.map((coach_id) => ({ training_session_id: sessionId, coach_id })));
+
+    if (insertCoachesError) {
+      return { status: 'error', message: insertCoachesError.message };
     }
   }
 

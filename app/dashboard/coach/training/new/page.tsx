@@ -9,17 +9,19 @@ type MemberRow = {
   athlete_id: string;
   athlete_profiles: { full_name: string } | null;
 };
+type CoachRow = { id: string; full_name: string };
 
 export default async function NewTrainingSessionPage() {
   const supabase = await createClient();
 
-  const [{ data: divisions }, { data: teams }, { data: members }] = await Promise.all([
+  const [{ data: divisions }, { data: teams }, { data: members }, { data: coaches }] = await Promise.all([
     supabase.from('divisions').select('id, name').order('name').returns<DivisionRow[]>(),
     supabase.from('teams').select('id, division_id').returns<TeamRow[]>(),
     supabase
       .from('team_members')
       .select('team_id, athlete_id, athlete_profiles(full_name)')
       .returns<MemberRow[]>(),
+    supabase.from('active_coach_options').select('id, full_name').order('full_name').returns<CoachRow[]>(),
   ]);
 
   const teamsByDivision = new Map<string, string[]>();
@@ -53,7 +55,7 @@ export default async function NewTrainingSessionPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-6">
-      <NewTrainingSessionForm divisions={divisionOptions} />
+      <NewTrainingSessionForm divisions={divisionOptions} coaches={coaches ?? []} />
       <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
         ← Volver
       </Link>
