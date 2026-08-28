@@ -30,7 +30,14 @@ export default async function DashboardPage({
     <main className="flex min-h-full flex-1 items-center justify-center bg-white px-4">
       <div className="text-center">
         <div className="mb-6 flex justify-center">
-          <Image src="/logo-wilddogs.png" alt="Wild Dogs" width={96} height={96} priority />
+          <Image
+            src="/logo-wilddogs.png"
+            alt="Wild Dogs"
+            width={192}
+            height={192}
+            priority
+            className="size-32 sm:size-40 md:size-48"
+          />
         </div>
         {error === 'unauthorized' && (
           <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
