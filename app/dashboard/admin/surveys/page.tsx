@@ -63,36 +63,50 @@ export default async function AdminSurveysPage({
       </div>
 
       <h2 className="mt-8 text-sm font-semibold text-neutral-700">Crear nueva encuesta</h2>
-      <form action={createTemplate} className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-neutral-500" htmlFor="title">
-            Título
-          </label>
-          <input
-            id="title"
-            name="title"
-            required
-            placeholder="Ej. Encuesta de seguimiento — temporada 2026"
-            className="w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm sm:w-72"
-          />
+      <form action={createTemplate} className="mt-3 flex flex-col gap-3 rounded-xl border border-neutral-200 p-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-neutral-500" htmlFor="title">
+              Título
+            </label>
+            <input
+              id="title"
+              name="title"
+              required
+              placeholder="Ej. Encuesta de seguimiento — temporada 2026"
+              className="w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm sm:w-72"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-neutral-500" htmlFor="target">
+              Dirigida a
+            </label>
+            <select
+              id="target"
+              name="target"
+              required
+              className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+            >
+              <option value="deportista">Deportistas</option>
+              <option value="padre">Padres</option>
+            </select>
+          </div>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-neutral-500" htmlFor="target">
-            Dirigida a
+          <label className="text-xs text-neutral-500" htmlFor="description">
+            Descripción (se muestra a quien responde)
           </label>
-          <select
-            id="target"
-            name="target"
-            required
-            className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-          >
-            <option value="deportista">Deportistas</option>
-            <option value="padre">Padres</option>
-          </select>
+          <textarea
+            id="description"
+            name="description"
+            rows={2}
+            placeholder="Ej. Esta encuesta es confidencial y busca..."
+            className="w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+          />
         </div>
         <button
           type="submit"
-          className="rounded-lg bg-brand-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-blue-hover"
+          className="w-fit rounded-lg bg-brand-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-blue-hover"
         >
           Crear y agregar preguntas
         </button>
