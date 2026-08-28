@@ -13,6 +13,7 @@ export type MatchBoxScoreData = {
   awayScore: number;
   fieldPlayers: (ReportPlayerRow & { jerseyNumber: number | null; position: string | null })[];
   goalies: (ReportPlayerRow & { jerseyNumber: number | null; position: string | null })[];
+  didNotPlay: { athleteId: string; label: string }[];
   teamStats: ReportTeamStats;
   statDefs: ReportStatDef[];
 };
@@ -78,10 +79,15 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
     await Promise.all([
       supabase
         .from('match_player_stats')
-        .select('athlete_id, stats, athlete_profiles(full_name, position)')
+        .select('athlete_id, stats, participated, athlete_profiles(full_name, position)')
         .eq('match_id', matchId)
         .returns<
-          { athlete_id: string; stats: Record<string, number>; athlete_profiles: { full_name: string; position: string | null } | null }[]
+          {
+            athlete_id: string;
+            stats: Record<string, number>;
+            participated: boolean;
+            athlete_profiles: { full_name: string; position: string | null } | null;
+          }[]
         >(),
       supabase
         .from('rosters')
@@ -120,19 +126,29 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
     jerseyByAthlete.set(rp.athlete_id, rp.jersey_number);
   }
 
-  const players: (ReportPlayerRow & { jerseyNumber: number | null; position: string | null })[] = (
-    matchPlayerStats ?? []
-  ).map((mps) => ({
-    athleteId: mps.athlete_id,
-    jerseyNumber: jerseyByAthlete.get(mps.athlete_id) ?? null,
-    position: mps.athlete_profiles?.position ?? null,
-    label: `#${jerseyByAthlete.get(mps.athlete_id) ?? '—'} ${mps.athlete_profiles?.full_name ?? '—'}`,
-    stats: mps.stats ?? {},
-  }));
+  const allRows = matchPlayerStats ?? [];
+
+  const players: (ReportPlayerRow & { jerseyNumber: number | null; position: string | null })[] = allRows
+    .filter((mps) => mps.participated)
+    .map((mps) => ({
+      athleteId: mps.athlete_id,
+      jerseyNumber: jerseyByAthlete.get(mps.athlete_id) ?? null,
+      position: mps.athlete_profiles?.position ?? null,
+      label: `#${jerseyByAthlete.get(mps.athlete_id) ?? '—'} ${mps.athlete_profiles?.full_name ?? '—'}`,
+      stats: mps.stats ?? {},
+    }));
   players.sort((a, b) => (a.jerseyNumber ?? 999) - (b.jerseyNumber ?? 999));
 
   const fieldPlayers = players.filter((p) => p.position !== 'portero');
   const goalies = players.filter((p) => p.position === 'portero');
+
+  const didNotPlay = allRows
+    .filter((mps) => !mps.participated)
+    .map((mps) => ({
+      athleteId: mps.athlete_id,
+      label: `#${jerseyByAthlete.get(mps.athlete_id) ?? '—'} ${mps.athlete_profiles?.full_name ?? '—'}`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   const statDefs: ReportStatDef[] = (tournamentStats ?? [])
     .map((row) => row.stat_definitions)
@@ -165,6 +181,7 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
       awayScore,
       fieldPlayers,
       goalies,
+      didNotPlay,
       teamStats,
       statDefs,
     },

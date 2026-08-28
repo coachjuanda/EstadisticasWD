@@ -73,6 +73,7 @@ export default async function MatchBoxScorePage({
           teamName={match.homeTeamName}
           fieldPlayers={match.fieldPlayers}
           goalies={match.goalies}
+          didNotPlay={match.didNotPlay}
           teamStats={match.teamStats}
           statDefs={match.statDefs}
         />

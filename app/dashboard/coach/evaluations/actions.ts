@@ -19,13 +19,21 @@ async function requireCoach() {
   return { supabase, coachId: user.id };
 }
 
+const DOFA_SPORT_PREFIXES = ['hockey_linea_', 'hockey_hielo_'];
+
 // $ el name attribute de cada campo codifica a qué pertenece
-// (score_<item_id>, block_notes_<block_id>, dofa_<quadrant>_<subarea>) --
-// así el form no necesita mandar la lista de bloques/ítems por separado.
+// (score_<item_id>, block_notes_<block_id>, dofa_<sport>_<quadrant>_<subarea>,
+// dofa_portero_<sport>_<item>) -- así el form no necesita mandar la lista de
+// bloques/ítems por separado. sport siempre es "hockey_linea" o
+// "hockey_hielo" (prefijo fijo, ambos con guion bajo interno), por eso se
+// hace match por prefijo en vez de split. El prefijo "dofa_portero_" se
+// revisa antes que "dofa_" (genérico de jugador de campo) porque también
+// empieza por ese texto.
 function parseForm(formData: FormData) {
   const scores: { item_id: string; score: number }[] = [];
   const blockNotes: { block_id: string; notes: string }[] = [];
-  const dofa: { quadrant: string; subarea: string; notes: string }[] = [];
+  const dofa: { sport: string; quadrant: string; subarea: string; notes: string }[] = [];
+  const goalieDofa: { sport: string; item: string; notes: string }[] = [];
 
   for (const [key, rawValue] of formData.entries()) {
     const value = String(rawValue);
@@ -33,14 +41,25 @@ function parseForm(formData: FormData) {
       scores.push({ item_id: key.slice('score_'.length), score: Number(value) });
     } else if (key.startsWith('block_notes_')) {
       blockNotes.push({ block_id: key.slice('block_notes_'.length), notes: value });
+    } else if (key.startsWith('dofa_portero_')) {
+      const rest = key.slice('dofa_portero_'.length);
+      const sportPrefix = DOFA_SPORT_PREFIXES.find((p) => rest.startsWith(p));
+      if (!sportPrefix) continue;
+      const sport = sportPrefix.slice(0, -1);
+      const item = rest.slice(sportPrefix.length);
+      goalieDofa.push({ sport, item, notes: value });
     } else if (key.startsWith('dofa_')) {
       const rest = key.slice('dofa_'.length);
-      const idx = rest.indexOf('_');
-      dofa.push({ quadrant: rest.slice(0, idx), subarea: rest.slice(idx + 1), notes: value });
+      const sportPrefix = DOFA_SPORT_PREFIXES.find((p) => rest.startsWith(p));
+      if (!sportPrefix) continue;
+      const sport = sportPrefix.slice(0, -1);
+      const afterSport = rest.slice(sportPrefix.length);
+      const idx = afterSport.indexOf('_');
+      dofa.push({ sport, quadrant: afterSport.slice(0, idx), subarea: afterSport.slice(idx + 1), notes: value });
     }
   }
 
-  return { scores, blockNotes, dofa };
+  return { scores, blockNotes, dofa, goalieDofa };
 }
 
 export async function createEvaluation(formData: FormData) {
@@ -63,7 +82,7 @@ export async function createEvaluation(formData: FormData) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent(reportError.message)}`);
   }
 
-  const { scores, blockNotes, dofa } = parseForm(formData);
+  const { scores, blockNotes, dofa, goalieDofa } = parseForm(formData);
 
   const { error: scoresError } = await supabase
     .from('evaluation_scores')
@@ -79,11 +98,22 @@ export async function createEvaluation(formData: FormData) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent(notesError.message)}`);
   }
 
-  const { error: dofaError } = await supabase
-    .from('evaluation_dofa')
-    .insert(dofa.map((d) => ({ report_id: report.id, quadrant: d.quadrant, subarea: d.subarea, notes: d.notes })));
-  if (dofaError) {
-    redirect(`${BASE_PATH}?error=${encodeURIComponent(dofaError.message)}`);
+  if (dofa.length > 0) {
+    const { error: dofaError } = await supabase
+      .from('evaluation_dofa')
+      .insert(dofa.map((d) => ({ report_id: report.id, sport: d.sport, quadrant: d.quadrant, subarea: d.subarea, notes: d.notes })));
+    if (dofaError) {
+      redirect(`${BASE_PATH}?error=${encodeURIComponent(dofaError.message)}`);
+    }
+  }
+
+  if (goalieDofa.length > 0) {
+    const { error: goalieDofaError } = await supabase
+      .from('evaluation_goalie_dofa')
+      .insert(goalieDofa.map((d) => ({ report_id: report.id, sport: d.sport, item: d.item, notes: d.notes })));
+    if (goalieDofaError) {
+      redirect(`${BASE_PATH}?error=${encodeURIComponent(goalieDofaError.message)}`);
+    }
   }
 
   revalidatePath(BASE_PATH);
@@ -98,7 +128,7 @@ export async function updateEvaluation(formData: FormData) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent('Falta el reporte.')}`);
   }
 
-  const { scores, blockNotes, dofa } = parseForm(formData);
+  const { scores, blockNotes, dofa, goalieDofa } = parseForm(formData);
 
   await supabase.from('evaluation_scores').delete().eq('report_id', report_id);
   const { error: scoresError } = await supabase
@@ -117,11 +147,23 @@ export async function updateEvaluation(formData: FormData) {
   }
 
   await supabase.from('evaluation_dofa').delete().eq('report_id', report_id);
-  const { error: dofaError } = await supabase
-    .from('evaluation_dofa')
-    .insert(dofa.map((d) => ({ report_id, quadrant: d.quadrant, subarea: d.subarea, notes: d.notes })));
-  if (dofaError) {
-    redirect(`${BASE_PATH}?error=${encodeURIComponent(dofaError.message)}`);
+  if (dofa.length > 0) {
+    const { error: dofaError } = await supabase
+      .from('evaluation_dofa')
+      .insert(dofa.map((d) => ({ report_id, sport: d.sport, quadrant: d.quadrant, subarea: d.subarea, notes: d.notes })));
+    if (dofaError) {
+      redirect(`${BASE_PATH}?error=${encodeURIComponent(dofaError.message)}`);
+    }
+  }
+
+  await supabase.from('evaluation_goalie_dofa').delete().eq('report_id', report_id);
+  if (goalieDofa.length > 0) {
+    const { error: goalieDofaError } = await supabase
+      .from('evaluation_goalie_dofa')
+      .insert(goalieDofa.map((d) => ({ report_id, sport: d.sport, item: d.item, notes: d.notes })));
+    if (goalieDofaError) {
+      redirect(`${BASE_PATH}?error=${encodeURIComponent(goalieDofaError.message)}`);
+    }
   }
 
   revalidatePath(BASE_PATH);

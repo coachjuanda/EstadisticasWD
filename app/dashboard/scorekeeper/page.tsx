@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { groupMatchesByTournament, indexOfMostRecentGroup } from '@/lib/matches/groupByTournament';
+import { TournamentGroupAccordion } from '../TournamentGroupAccordion';
 
 type MatchRow = {
   id: string;
@@ -7,6 +9,7 @@ type MatchRow = {
   location: string | null;
   away_team_name: string;
   status: string;
+  tournament_id: string;
   teams: { name: string } | null;
   tournaments: { name: string } | null;
 };
@@ -26,46 +29,57 @@ export default async function ScorekeeperHomePage() {
 
   const { data: matches } = await supabase
     .from('matches')
-    .select('id, scheduled_at, location, away_team_name, status, teams(name), tournaments(name)')
+    .select('id, scheduled_at, location, away_team_name, status, tournament_id, teams(name), tournaments(name)')
     .eq('scorekeeper_id', user!.id)
     .order('scheduled_at', { ascending: true })
     .returns<MatchRow[]>();
 
   const matchList = matches ?? [];
+  const tournamentGroups = groupMatchesByTournament(matchList);
+  const defaultOpenIdx = indexOfMostRecentGroup(tournamentGroups);
 
   return (
     <div className="mx-auto max-w-2xl p-6">
       <h1 className="text-xl font-semibold text-neutral-900">Mis partidos</h1>
 
       <div className="mt-6 flex flex-col gap-3">
-        {matchList.map((m) => (
-          <a
-            key={m.id}
-            href={`/dashboard/scorekeeper/${m.id}`}
-            className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-4 hover:border-brand-blue"
+        {tournamentGroups.map((group, idx) => (
+          <TournamentGroupAccordion
+            key={group.tournamentId}
+            name={group.tournamentName}
+            matchCount={group.matches.length}
+            defaultOpen={idx === defaultOpenIdx}
           >
-            <div>
-              <p className="font-medium text-neutral-900">
-                {m.teams?.name ?? '—'} vs {m.away_team_name}
-              </p>
-              <p className="text-sm text-neutral-500">
-                {new Date(m.scheduled_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
-                {' · '}
-                {m.location || 'sin cancha definida'} · {m.tournaments?.name ?? '—'}
-              </p>
-            </div>
-            <span
-              className={
-                m.status === 'programado'
-                  ? 'rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600'
-                  : m.status === 'en_vivo'
-                    ? 'rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700'
-                    : 'rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700'
-              }
-            >
-              {STATUS_LABELS[m.status] ?? m.status}
-            </span>
-          </a>
+            {group.matches.map((m) => (
+              <a
+                key={m.id}
+                href={`/dashboard/scorekeeper/${m.id}`}
+                className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-4 hover:border-brand-blue"
+              >
+                <div>
+                  <p className="font-medium text-neutral-900">
+                    {m.teams?.name ?? '—'} vs {m.away_team_name}
+                  </p>
+                  <p className="text-sm text-neutral-500">
+                    {new Date(m.scheduled_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {' · '}
+                    {m.location || 'sin cancha definida'}
+                  </p>
+                </div>
+                <span
+                  className={
+                    m.status === 'programado'
+                      ? 'rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-600'
+                      : m.status === 'en_vivo'
+                        ? 'rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700'
+                        : 'rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700'
+                  }
+                >
+                  {STATUS_LABELS[m.status] ?? m.status}
+                </span>
+              </a>
+            ))}
+          </TournamentGroupAccordion>
         ))}
         {matchList.length === 0 && (
           <p className="text-sm text-neutral-500">

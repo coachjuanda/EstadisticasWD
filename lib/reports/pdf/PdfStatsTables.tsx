@@ -11,6 +11,8 @@ const styles = StyleSheet.create({
   cell: { flex: 1, padding: 4, fontSize: 8, textAlign: 'center' },
   headerCell: { flex: 1, padding: 4, fontSize: 6.5, textAlign: 'center', color: '#6b7280', fontWeight: 700 },
   emptyText: { fontSize: 8, color: '#6b7280', padding: 6, textAlign: 'center' },
+  didNotPlay: { fontSize: 8, color: '#6b7280', marginTop: 4 },
+  didNotPlayLabel: { fontWeight: 700, color: '#1a1a1a' },
 });
 
 const bySortOrder = (a: ReportStatDef, b: ReportStatDef) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
@@ -19,12 +21,14 @@ export function PdfStatsTables({
   teamName,
   fieldPlayers,
   goalies,
+  didNotPlay,
   teamStats,
   statDefs,
 }: {
   teamName: string;
   fieldPlayers: ReportPlayerRow[];
   goalies: ReportPlayerRow[];
+  didNotPlay?: { athleteId: string; label: string }[];
   teamStats: ReportTeamStats;
   statDefs: ReportStatDef[];
 }) {
@@ -44,6 +48,13 @@ export function PdfStatsTables({
 
   return (
     <>
+      {didNotPlay && didNotPlay.length > 0 && (
+        <Text style={styles.didNotPlay}>
+          <Text style={styles.didNotPlayLabel}>No participaron en este partido: </Text>
+          {didNotPlay.map((p) => p.label).join(', ')}
+        </Text>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Jugadores</Text>
         <View style={styles.headerRow}>

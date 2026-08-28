@@ -53,23 +53,31 @@ export async function deleteRoster(formData: FormData) {
   redirect(BASE_PATH);
 }
 
-export async function addRosterPlayer(formData: FormData) {
+export async function addRosterPlayers(formData: FormData) {
   const roster_id = formData.get('roster_id') as string;
-  const athlete_id = formData.get('athlete_id') as string;
-  const jersey_number = formData.get('jersey_number') as string;
+  const playersJson = formData.get('players_json') as string;
 
-  if (!roster_id || !athlete_id) {
-    redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent('Elige un deportista.')}`);
+  if (!roster_id || !playersJson) {
+    redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent('Elige al menos un deportista.')}`);
+  }
+
+  let players: { athlete_id: string; jersey_number: number | null }[];
+  try {
+    players = JSON.parse(playersJson);
+  } catch {
+    redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent('Datos inválidos.')}`);
+  }
+
+  if (!Array.isArray(players) || players.length === 0) {
+    redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent('Elige al menos un deportista.')}`);
   }
 
   const supabase = await createClient();
   const { data: roster } = await supabase.from('rosters').select('team_id').eq('id', roster_id).single();
 
-  const { error } = await supabase.from('roster_players').insert({
-    roster_id,
-    athlete_id,
-    jersey_number: jersey_number ? Number(jersey_number) : null,
-  });
+  const { error } = await supabase
+    .from('roster_players')
+    .insert(players.map((p) => ({ roster_id, athlete_id: p.athlete_id, jersey_number: p.jersey_number })));
 
   if (error) {
     redirect(`${BASE_PATH}?roster=${roster_id}&error=${encodeURIComponent(friendlyError(error))}`);
@@ -80,9 +88,10 @@ export async function addRosterPlayer(formData: FormData) {
   // también entrena con el equipo. ignoreDuplicates: ya puede estar ahí de
   // una nómina anterior, no es un error.
   if (roster?.team_id) {
-    await supabase
-      .from('team_members')
-      .upsert({ team_id: roster.team_id, athlete_id }, { onConflict: 'team_id,athlete_id', ignoreDuplicates: true });
+    await supabase.from('team_members').upsert(
+      players.map((p) => ({ team_id: roster.team_id, athlete_id: p.athlete_id })),
+      { onConflict: 'team_id,athlete_id', ignoreDuplicates: true }
+    );
   }
 
   revalidatePath(BASE_PATH);

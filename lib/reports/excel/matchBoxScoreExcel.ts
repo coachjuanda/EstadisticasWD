@@ -23,6 +23,9 @@ export async function buildMatchBoxScoreExcel(match: MatchBoxScoreData): Promise
   info.addRow(['Fecha', new Date(match.scheduledAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })]);
   if (match.location) info.addRow(['Cancha', match.location]);
   info.addRow(['Estado', STATUS_LABELS[match.status] ?? match.status]);
+  if (match.didNotPlay.length > 0) {
+    info.addRow(['No participaron', match.didNotPlay.map((p) => p.label).join(', ')]);
+  }
   info.getColumn(1).width = 14;
   info.getColumn(2).width = 30;
 

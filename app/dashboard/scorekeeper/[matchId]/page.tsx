@@ -80,7 +80,8 @@ export default async function ScorekeeperMatchPage({
     const { data: stats } = await supabase
       .from('match_player_stats')
       .select('stats')
-      .eq('match_id', matchId);
+      .eq('match_id', matchId)
+      .eq('participated', true);
 
     const homeScore = (stats ?? []).reduce((sum, s) => sum + ((s.stats as Record<string, number>).goals ?? 0), 0);
     const awayScore = (stats ?? []).reduce(
@@ -110,13 +111,14 @@ export default async function ScorekeeperMatchPage({
     await Promise.all([
       supabase
         .from('match_player_stats')
-        .select('id, athlete_id, stats, athlete_profiles(full_name, position)')
+        .select('id, athlete_id, stats, participated, athlete_profiles(full_name, position)')
         .eq('match_id', matchId)
         .returns<
           {
             id: string;
             athlete_id: string;
             stats: Record<string, number>;
+            participated: boolean;
             athlete_profiles: { full_name: string; position: string | null } | null;
           }[]
         >(),
@@ -163,6 +165,7 @@ export default async function ScorekeeperMatchPage({
     fullName: mps.athlete_profiles?.full_name ?? '—',
     jerseyNumber: jerseyByAthlete.get(mps.athlete_id) ?? null,
     position: mps.athlete_profiles?.position ?? null,
+    participated: mps.participated,
     stats: mps.stats ?? {},
   }));
   players.sort((a, b) => (a.jerseyNumber ?? 999) - (b.jerseyNumber ?? 999));

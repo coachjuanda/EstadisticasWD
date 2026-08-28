@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { createRoster, deleteRoster, addRosterPlayer, removeRosterPlayer } from './actions';
+import { createRoster, deleteRoster, removeRosterPlayer } from './actions';
+import { AddRosterPlayersForm } from './AddRosterPlayersForm';
 
 type TeamOption = { id: string; name: string; divisions: { name: string } | null };
 type TournamentOption = { id: string; name: string };
@@ -48,7 +49,7 @@ export default async function RostersPage({
   if (rosterId) {
     const roster = rosterList.find((r) => r.id === rosterId);
 
-    const [{ data: rosterPlayers }, { data: athletes }] = await Promise.all([
+    const [{ data: rosterPlayers }, { data: athletes }, { data: otherRosterPlayers }] = await Promise.all([
       supabase
         .from('roster_players')
         .select('id, jersey_number, athlete_id, athlete_profiles(full_name, position)')
@@ -61,11 +62,33 @@ export default async function RostersPage({
         .eq('role', 'deportista')
         .order('full_name')
         .returns<AthleteOption[]>(),
+      // Para sugerir el número de camiseta: todas las filas de roster_players
+      // del club (RLS ya las acota a "mi club"), sin importar de qué nómina
+      // sean -- se usa la más reciente por deportista si tiene varias.
+      supabase
+        .from('roster_players')
+        .select('athlete_id, jersey_number, created_at')
+        .not('jersey_number', 'is', null)
+        .returns<{ athlete_id: string; jersey_number: number; created_at: string }[]>(),
     ]);
 
     const playerList = rosterPlayers ?? [];
     const alreadyInRoster = new Set(playerList.map((p) => p.athlete_id));
-    const availableAthletes = (athletes ?? []).filter((a) => !alreadyInRoster.has(a.id));
+
+    const latestJerseyByAthlete = new Map<string, { jersey_number: number; created_at: string }>();
+    for (const row of otherRosterPlayers ?? []) {
+      const current = latestJerseyByAthlete.get(row.athlete_id);
+      if (!current || row.created_at > current.created_at) {
+        latestJerseyByAthlete.set(row.athlete_id, row);
+      }
+    }
+
+    const availableAthletes = (athletes ?? [])
+      .filter((a) => !alreadyInRoster.has(a.id))
+      .map((a) => ({
+        ...a,
+        suggestedJersey: latestJerseyByAthlete.get(a.id)?.jersey_number ?? null,
+      }));
 
     return (
       <div className="mx-auto max-w-2xl">
@@ -136,53 +159,9 @@ export default async function RostersPage({
         </div>
 
         <h2 className="mt-8 text-sm font-semibold text-neutral-700">
-          Agregar deportista
+          Agregar deportistas
         </h2>
-        <form action={addRosterPlayer} className="mt-3 flex flex-wrap items-end gap-2">
-          <input type="hidden" name="roster_id" value={rosterId} />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-neutral-500" htmlFor="athlete_id">
-              Deportista
-            </label>
-            <select
-              id="athlete_id"
-              name="athlete_id"
-              required
-              disabled={availableAthletes.length === 0}
-              className="max-w-full rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-            >
-              {availableAthletes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.full_name} ({a.cedula})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-neutral-500" htmlFor="jersey_number">
-              Número
-            </label>
-            <input
-              id="jersey_number"
-              name="jersey_number"
-              type="number"
-              min={0}
-              className="w-20 rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={availableAthletes.length === 0}
-            className="rounded-lg bg-brand-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-blue-hover disabled:opacity-50"
-          >
-            Agregar
-          </button>
-        </form>
-        {availableAthletes.length === 0 && (athletes ?? []).length > 0 && (
-          <p className="mt-2 text-sm text-neutral-500">
-            Todos los deportistas del club ya están en esta nómina.
-          </p>
-        )}
+        {(athletes ?? []).length > 0 && <AddRosterPlayersForm rosterId={rosterId} athletes={availableAthletes} />}
         {(athletes ?? []).length === 0 && (
           <p className="mt-2 text-sm text-neutral-500">
             No hay deportistas creados todavía en{' '}

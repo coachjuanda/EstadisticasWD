@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: '/dashboard/admin/rosters', label: 'Nóminas' },
   { href: '/dashboard/admin/matches', label: 'Partidos' },
   { href: '/dashboard/admin/evaluations', label: 'Evaluaciones' },
+  { href: '/dashboard/admin/evaluation-template', label: 'Plantilla de evaluación' },
   { href: '/dashboard/admin/training', label: 'Entrenamientos' },
   { href: '/dashboard/admin/surveys', label: 'Encuestas' },
 ];

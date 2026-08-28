@@ -8,12 +8,14 @@ export function StatsTables({
   teamName,
   fieldPlayers,
   goalies,
+  didNotPlay,
   teamStats,
   statDefs,
 }: {
   teamName: string;
   fieldPlayers: ReportPlayerRow[];
   goalies: ReportPlayerRow[];
+  didNotPlay?: { athleteId: string; label: string }[];
   teamStats: ReportTeamStats;
   statDefs: ReportStatDef[];
 }) {
@@ -35,6 +37,13 @@ export function StatsTables({
 
   return (
     <div className="flex flex-col gap-6">
+      {didNotPlay && didNotPlay.length > 0 && (
+        <p className="text-sm text-neutral-500">
+          <span className="font-medium text-neutral-700">No participaron en este partido: </span>
+          {didNotPlay.map((p) => p.label).join(', ')}
+        </p>
+      )}
+
       <section>
         <h2 className="text-sm font-semibold text-neutral-700">Jugadores</h2>
         <div className="mt-2 overflow-x-auto rounded-xl border border-neutral-200">

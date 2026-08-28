@@ -39,13 +39,19 @@ export type AthleteProfileData = {
   attendanceTotal: number;
   attendancePresent: number;
   recentTrainingSessions: AthleteTrainingSession[];
+  attendanceMonthOptions: string[];
+  selectedAttendanceMonth: string | null;
+  attendanceMonthPct: number | null;
+  attendanceMonthTotal: number;
+  attendanceMonthPresent: number;
 };
 
 export async function loadAthleteProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,
   athleteId: string,
-  tournamentFilter?: string
+  tournamentFilter?: string,
+  attendanceMonthFilter?: string
 ): Promise<LoadResult<AthleteProfileData>> {
   const {
     data: { user },
@@ -103,7 +109,8 @@ export async function loadAthleteProfile(
   let statsQuery = supabase
     .from('match_player_stats')
     .select('stats, matches!inner(tournament_id, tournaments(name))')
-    .eq('athlete_id', athleteId);
+    .eq('athlete_id', athleteId)
+    .eq('participated', true);
 
   if (tournamentFilter) {
     statsQuery = statsQuery.eq('matches.tournament_id', tournamentFilter);
@@ -119,6 +126,7 @@ export async function loadAthleteProfile(
     .from('match_player_stats')
     .select('matches!inner(tournament_id, tournaments(name))')
     .eq('athlete_id', athleteId)
+    .eq('participated', true)
     .returns<{ matches: { tournament_id: string; tournaments: { name: string } | null } }[]>();
 
   const tournamentsPlayed = new Map<string, string>();
@@ -181,7 +189,26 @@ export async function loadAthleteProfile(
   const attendancePresent = attendance.filter((r) => r.present).length;
   const attendancePct = attendanceTotal > 0 ? Math.round((attendancePresent / attendanceTotal) * 100) : null;
 
-  const recentTrainingSessions: AthleteTrainingSession[] = attendance
+  // Meses con al menos una convocatoria, más recientes primero -- alimenta
+  // el selector de mes sin necesitar una consulta aparte.
+  const attendanceMonthOptions = [
+    ...new Set(attendance.map((r) => r.training_sessions!.scheduled_at.slice(0, 7))),
+  ].sort((a, b) => b.localeCompare(a));
+
+  const attendanceInMonth = attendanceMonthFilter
+    ? attendance.filter((r) => r.training_sessions!.scheduled_at.slice(0, 7) === attendanceMonthFilter)
+    : null;
+  const attendanceMonthTotal = attendanceInMonth?.length ?? 0;
+  const attendanceMonthPresent = attendanceInMonth?.filter((r) => r.present).length ?? 0;
+  const attendanceMonthPct =
+    attendanceInMonth && attendanceInMonth.length > 0
+      ? Math.round((attendanceMonthPresent / attendanceInMonth.length) * 100)
+      : null;
+
+  // Sin mes seleccionado: últimas 10 convocatorias en total. Con mes
+  // seleccionado: todas las convocatorias de ese mes (normalmente pocas).
+  const sessionsInScope = attendanceInMonth ?? attendance;
+  const recentTrainingSessions: AthleteTrainingSession[] = sessionsInScope
     .map((r) => ({
       id: r.id,
       scheduledAt: r.training_sessions!.scheduled_at,
@@ -192,7 +219,7 @@ export async function loadAthleteProfile(
       present: r.present,
     }))
     .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt))
-    .slice(0, 10);
+    .slice(0, attendanceInMonth ? undefined : 10);
 
   return {
     ok: true,
@@ -219,6 +246,11 @@ export async function loadAthleteProfile(
       attendanceTotal,
       attendancePresent,
       recentTrainingSessions,
+      attendanceMonthOptions,
+      selectedAttendanceMonth: attendanceMonthFilter ?? null,
+      attendanceMonthPct,
+      attendanceMonthTotal,
+      attendanceMonthPresent,
     },
   };
 }

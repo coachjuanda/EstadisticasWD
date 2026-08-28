@@ -3,18 +3,27 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { loadAthleteProfile } from '@/lib/reports/athleteProfile';
 
+const MONTH_FORMATTER = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' });
+
+function monthLabel(month: string) {
+  // month viene como "YYYY-MM" -- se ancla al día 2 para evitar corrimientos
+  // de zona horaria que muestren el mes anterior.
+  const label = MONTH_FORMATTER.format(new Date(`${month}-02T00:00:00`));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export default async function AthleteProfilePage({
   params,
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ tournament_id?: string }>;
+  searchParams: Promise<{ tournament_id?: string; attendance_month?: string }>;
 }) {
   const { athleteId } = await params;
-  const { tournament_id: tournamentFilter } = await searchParams;
+  const { tournament_id: tournamentFilter, attendance_month: attendanceMonthFilter } = await searchParams;
   const supabase = await createClient();
 
-  const result = await loadAthleteProfile(supabase, athleteId, tournamentFilter);
+  const result = await loadAthleteProfile(supabase, athleteId, tournamentFilter, attendanceMonthFilter);
   if (!result.ok) redirect('/dashboard?error=unauthorized');
   const athlete = result.data;
 
@@ -81,13 +90,56 @@ export default async function AthleteProfilePage({
 
       {athlete.attendancePct !== null && (
         <div className="mt-8">
-          <h2 className="text-sm font-semibold text-neutral-700">Asistencia a entrenamientos</h2>
-          <div className="mt-2 flex items-center gap-4 rounded-xl border border-neutral-200 p-4">
-            <p className="text-3xl font-bold tabular-nums text-neutral-900">{athlete.attendancePct}%</p>
-            <p className="text-sm text-neutral-500">
-              {athlete.attendancePresent} de {athlete.attendanceTotal} convocatorias
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-neutral-700">Asistencia a entrenamientos</h2>
+            <form method="GET" className="flex items-end gap-2">
+              {tournamentFilter && <input type="hidden" name="tournament_id" value={tournamentFilter} />}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-neutral-500" htmlFor="attendance-month">
+                  Mes
+                </label>
+                <select
+                  id="attendance-month"
+                  name="attendance_month"
+                  defaultValue={athlete.selectedAttendanceMonth ?? ''}
+                  className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
+                >
+                  <option value="">Acumulado (todo)</option>
+                  {athlete.attendanceMonthOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {monthLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-100"
+              >
+                Ver
+              </button>
+            </form>
           </div>
+
+          {athlete.selectedAttendanceMonth ? (
+            <div className="mt-2 flex items-center gap-4 rounded-xl border border-neutral-200 p-4">
+              <p className="text-3xl font-bold tabular-nums text-neutral-900">
+                {athlete.attendanceMonthPct !== null ? `${athlete.attendanceMonthPct}%` : '—'}
+              </p>
+              <p className="text-sm text-neutral-500">
+                {athlete.attendanceMonthTotal > 0
+                  ? `${athlete.attendanceMonthPresent} de ${athlete.attendanceMonthTotal} convocatorias en ${monthLabel(athlete.selectedAttendanceMonth)}`
+                  : `Sin convocatorias en ${monthLabel(athlete.selectedAttendanceMonth)}`}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center gap-4 rounded-xl border border-neutral-200 p-4">
+              <p className="text-3xl font-bold tabular-nums text-neutral-900">{athlete.attendancePct}%</p>
+              <p className="text-sm text-neutral-500">
+                {athlete.attendancePresent} de {athlete.attendanceTotal} convocatorias (acumulado)
+              </p>
+            </div>
+          )}
           <div className="mt-3 flex flex-col gap-1">
             {athlete.recentTrainingSessions.map((s) => (
               <div

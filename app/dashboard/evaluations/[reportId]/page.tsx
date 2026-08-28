@@ -21,6 +21,18 @@ const SUBAREA_LABELS: Record<string, string> = {
   autoconfianza: 'Autoconfianza',
 };
 
+const DOFA_SPORT_LABELS: Record<string, string> = {
+  hockey_linea: 'DOFA — Hockey en línea',
+  hockey_hielo: 'DOFA — Hockey en hielo',
+};
+
+const GOALIE_DOFA_ITEM_LABELS: Record<string, string> = {
+  oportunidades_mejora: 'Oportunidades de mejora',
+  fortalezas: 'Fortalezas',
+  aprendizajes: 'Aprendizajes',
+  metas: 'Metas',
+};
+
 export default async function EvaluationDetailPage({
   params,
 }: {
@@ -61,29 +73,49 @@ export default async function EvaluationDetailPage({
     .eq('id', report.coach_id)
     .maybeSingle();
 
-  const [{ data: blocksData }, { data: itemsData }, { data: scoresData }, { data: notesData }, { data: dofaData }] =
-    await Promise.all([
-      supabase.from('evaluation_blocks').select('id, key, label, sort_order').order('sort_order').returns<BlockRow[]>(),
-      supabase
-        .from('evaluation_items')
-        .select('id, block_id, key, label, sort_order')
-        .order('sort_order')
-        .returns<ItemRow[]>(),
-      supabase.from('evaluation_scores').select('item_id, score').eq('report_id', reportId),
-      supabase.from('evaluation_block_notes').select('block_id, notes').eq('report_id', reportId),
-      supabase.from('evaluation_dofa').select('quadrant, subarea, notes').eq('report_id', reportId),
-    ]);
+  const [
+    { data: blocksData },
+    { data: itemsData },
+    { data: scoresData },
+    { data: notesData },
+    { data: dofaData },
+    { data: goalieDofaData },
+  ] = await Promise.all([
+    supabase.from('evaluation_blocks').select('id, key, label, sort_order').order('sort_order').returns<BlockRow[]>(),
+    supabase
+      .from('evaluation_items')
+      .select('id, block_id, key, label, sort_order')
+      .order('sort_order')
+      .returns<ItemRow[]>(),
+    supabase.from('evaluation_scores').select('item_id, score').eq('report_id', reportId),
+    supabase.from('evaluation_block_notes').select('block_id, notes').eq('report_id', reportId),
+    supabase.from('evaluation_dofa').select('sport, quadrant, subarea, notes').eq('report_id', reportId),
+    supabase.from('evaluation_goalie_dofa').select('sport, item, notes').eq('report_id', reportId),
+  ]);
 
   const scoreByItem = new Map((scoresData ?? []).map((s) => [s.item_id, s.score as number]));
   const notesByBlock = new Map((notesData ?? []).map((n) => [n.block_id, n.notes]));
-  const dofaByKey = new Map((dofaData ?? []).map((d) => [`${d.quadrant}_${d.subarea}`, d.notes]));
+  const dofaByKey = new Map((dofaData ?? []).map((d) => [`${d.sport}_${d.quadrant}_${d.subarea}`, d.notes]));
+  const goalieDofaByKey = new Map((goalieDofaData ?? []).map((d) => [`${d.sport}_${d.item}`, d.notes]));
+  // El reporte guarda uno u otro según la posición al momento de evaluar
+  // (nunca ambos) -- la presencia de filas en evaluation_goalie_dofa decide
+  // cuál estructura mostrar, sin depender de la posición actual del
+  // deportista.
+  const isGoalieReport = (goalieDofaData ?? []).length > 0;
 
-  const blocks = (blocksData ?? []).map((b) => {
-    const items = (itemsData ?? []).filter((i) => i.block_id === b.id);
-    const scores = items.map((i) => scoreByItem.get(i.id)).filter((s): s is number => s !== undefined);
-    const average = scores.length > 0 ? scores.reduce((a, b2) => a + b2, 0) / scores.length : null;
-    return { ...b, items, average, notes: notesByBlock.get(b.id) ?? '' };
-  });
+  // El catálogo tiene bloques de jugador de campo Y de portero, pero un
+  // reporte solo tiene puntajes de la posición real del deportista al
+  // momento de evaluar -- se muestran solo los bloques con al menos un
+  // puntaje registrado, sin depender de la posición actual del deportista
+  // ni de si el bloque sigue activo en el catálogo.
+  const blocks = (blocksData ?? [])
+    .map((b) => {
+      const items = (itemsData ?? []).filter((i) => i.block_id === b.id);
+      const scores = items.map((i) => scoreByItem.get(i.id)).filter((s): s is number => s !== undefined);
+      const average = scores.length > 0 ? scores.reduce((a, b2) => a + b2, 0) / scores.length : null;
+      return { ...b, items, scores, average, notes: notesByBlock.get(b.id) ?? '' };
+    })
+    .filter((b) => b.scores.length > 0);
 
   return (
     <div className="mx-auto w-full max-w-3xl p-6">
@@ -132,28 +164,66 @@ export default async function EvaluationDetailPage({
         ))}
       </div>
 
-      <section className="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-neutral-700">DOFA</h2>
-        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {Object.entries(QUADRANT_LABELS).map(([qKey, qLabel]) => (
-            <div key={qKey}>
-              <p className="text-sm font-medium text-neutral-800">{qLabel}</p>
-              <dl className="mt-1 flex flex-col gap-1">
-                {Object.entries(SUBAREA_LABELS).map(([sKey, sLabel]) => {
-                  const text = dofaByKey.get(`${qKey}_${sKey}`);
-                  if (!text) return null;
-                  return (
-                    <div key={sKey} className="text-sm">
-                      <dt className="font-medium text-neutral-600">{sLabel}</dt>
-                      <dd className="text-neutral-700">{text}</dd>
-                    </div>
-                  );
-                })}
-              </dl>
-            </div>
-          ))}
-        </div>
-      </section>
+      {isGoalieReport
+        ? Object.entries(DOFA_SPORT_LABELS).map(([sportKey, sportLabel]) => {
+            const hasContent = Object.keys(GOALIE_DOFA_ITEM_LABELS).some((itemKey) =>
+              goalieDofaByKey.get(`${sportKey}_${itemKey}`)
+            );
+            return (
+              <section key={sportKey} className="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
+                <h2 className="text-sm font-semibold text-neutral-700">{sportLabel}</h2>
+                {hasContent ? (
+                  <dl className="mt-3 flex flex-col gap-3">
+                    {Object.entries(GOALIE_DOFA_ITEM_LABELS).map(([itemKey, itemLabel]) => {
+                      const text = goalieDofaByKey.get(`${sportKey}_${itemKey}`);
+                      if (!text) return null;
+                      return (
+                        <div key={itemKey} className="text-sm">
+                          <dt className="font-medium text-neutral-800">{itemLabel}</dt>
+                          <dd className="mt-0.5 text-neutral-700">{text}</dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                ) : (
+                  <p className="mt-2 text-sm text-neutral-500">Sin información registrada.</p>
+                )}
+              </section>
+            );
+          })
+        : Object.entries(DOFA_SPORT_LABELS).map(([sportKey, sportLabel]) => {
+            const hasContent = Object.keys(QUADRANT_LABELS).some((qKey) =>
+              Object.keys(SUBAREA_LABELS).some((sKey) => dofaByKey.get(`${sportKey}_${qKey}_${sKey}`))
+            );
+            return (
+              <section key={sportKey} className="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
+                <h2 className="text-sm font-semibold text-neutral-700">{sportLabel}</h2>
+                {hasContent ? (
+                  <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {Object.entries(QUADRANT_LABELS).map(([qKey, qLabel]) => (
+                      <div key={qKey}>
+                        <p className="text-sm font-medium text-neutral-800">{qLabel}</p>
+                        <dl className="mt-1 flex flex-col gap-1">
+                          {Object.entries(SUBAREA_LABELS).map(([sKey, sLabel]) => {
+                            const text = dofaByKey.get(`${sportKey}_${qKey}_${sKey}`);
+                            if (!text) return null;
+                            return (
+                              <div key={sKey} className="text-sm">
+                                <dt className="font-medium text-neutral-600">{sLabel}</dt>
+                                <dd className="text-neutral-700">{text}</dd>
+                              </div>
+                            );
+                          })}
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-neutral-500">Sin información registrada.</p>
+                )}
+              </section>
+            );
+          })}
 
       <Link href="/dashboard" className="mt-8 inline-block text-sm text-neutral-500 hover:underline">
         ← Volver

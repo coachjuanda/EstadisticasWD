@@ -105,6 +105,7 @@ export async function loadTeamSummary(supabase: SupabaseClient<any>, rosterId: s
             .from('match_player_stats')
             .select('athlete_id, stats')
             .eq('team_id', roster.team_id)
+            .eq('participated', true)
             .in('match_id', matchIds)
             .returns<{ athlete_id: string; stats: Record<string, number> }[]>(),
           supabase

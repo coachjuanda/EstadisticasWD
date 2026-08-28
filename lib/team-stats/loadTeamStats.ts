@@ -206,6 +206,7 @@ export async function loadTeamStats(
             .from('match_player_stats')
             .select('match_id, athlete_id, stats, athlete_profiles(full_name, position)')
             .eq('team_id', teamId)
+            .eq('participated', true)
             .in('match_id', playedMatchIds)
             .returns<{ match_id: string; athlete_id: string; stats: Record<string, number>; athlete_profiles: { full_name: string; position: string | null } | null }[]>(),
           supabase

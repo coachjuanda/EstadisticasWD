@@ -11,6 +11,7 @@ export type PlayerData = {
   fullName: string;
   jerseyNumber: number | null;
   position: string | null;
+  participated: boolean;
   stats: Record<string, number>;
 };
 
@@ -99,14 +100,16 @@ export function LiveMatchClient({
   const goalieStatDefs = statDefs.filter((s) => s.scope === 'jugador' && s.appliesTo === 'portero').sort(bySortOrder);
   const teamStatDefs = statDefs.filter((s) => s.scope === 'equipo').sort(bySortOrder);
 
-  const fieldPlayers = players.filter((p) => p.position !== 'portero');
-  const goalies = players.filter((p) => p.position === 'portero');
+  const activePlayers = players.filter((p) => p.participated);
+  const removedPlayers = players.filter((p) => !p.participated);
+  const fieldPlayers = activePlayers.filter((p) => p.position !== 'portero');
+  const goalies = activePlayers.filter((p) => p.position === 'portero');
 
   // "+/-" calculado (Plus - Minus), mismo patrón que SV% y Efectividad PP/PK.
   const hasPlusMinus = fieldStatDefs.some((s) => s.key === 'plus') && fieldStatDefs.some((s) => s.key === 'minus');
 
-  const homeScore = players.reduce((sum, p) => sum + (p.stats.goals ?? 0), 0);
-  const awayScore = players.reduce((sum, p) => sum + (p.stats.goals_received ?? 0), 0);
+  const homeScore = activePlayers.reduce((sum, p) => sum + (p.stats.goals ?? 0), 0);
+  const awayScore = activePlayers.reduce((sum, p) => sum + (p.stats.goals_received ?? 0), 0);
 
   // Efectividad de PP/PK: calculada, no se ingresa -- mismo patrón que SV%.
   const hasPpPair = teamStatDefs.some((s) => s.key === 'pp') && teamStatDefs.some((s) => s.key === 'pp_goal');
@@ -140,6 +143,14 @@ export function LiveMatchClient({
         )
       );
     }
+  }
+
+  async function handleToggleParticipation(matchPlayerStatId: string, participated: boolean) {
+    setPlayers((prev) =>
+      prev.map((p) => (p.matchPlayerStatId === matchPlayerStatId ? { ...p, participated } : p))
+    );
+
+    await supabase.from('match_player_stats').update({ participated }).eq('id', matchPlayerStatId);
   }
 
   async function handleTeamTap(statKey: string, delta: number) {
@@ -201,6 +212,51 @@ export function LiveMatchClient({
       >
         {finalizing ? 'Finalizando...' : 'Finalizar partido'}
       </button>
+
+      <details className="group mt-6 rounded-xl border border-neutral-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <h2 className="text-sm font-semibold text-neutral-700">
+            Convocatoria ({activePlayers.length}/{players.length} activos)
+          </h2>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="h-4 w-4 shrink-0 text-neutral-400 transition-transform group-open:rotate-180"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </summary>
+        <div className="flex flex-col gap-1 px-4 pb-4">
+          <p className="mb-1 text-xs text-neutral-500">
+            Remueve a un jugador si no participó en este partido (lesión, inasistencia, etc). No
+            afecta su nómina del torneo ni otros partidos.
+          </p>
+          {activePlayers.map((p) => (
+            <div
+              key={p.matchPlayerStatId}
+              className="flex items-center justify-between rounded-lg border border-neutral-100 px-3 py-2 text-sm"
+            >
+              <span className="text-neutral-900">
+                #{p.jerseyNumber ?? '—'} {p.fullName}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleToggleParticipation(p.matchPlayerStatId, false)}
+                className="rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+              >
+                Remover del partido
+              </button>
+            </div>
+          ))}
+          {activePlayers.length === 0 && (
+            <p className="px-3 py-2 text-sm text-neutral-500">Sin jugadores activos en este partido.</p>
+          )}
+        </div>
+      </details>
 
       <section className="mt-6">
         <h2 className="text-sm font-semibold text-neutral-700">Jugadores</h2>
@@ -417,6 +473,34 @@ export function LiveMatchClient({
           </table>
         </div>
       </section>
+
+      {removedPlayers.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold text-neutral-700">Jugadores ausentes</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            No participaron en este partido. Reincorpóralos si los removiste por error.
+          </p>
+          <div className="mt-2 flex flex-col gap-1">
+            {removedPlayers.map((p) => (
+              <div
+                key={p.matchPlayerStatId}
+                className="flex items-center justify-between rounded-lg border border-neutral-100 px-3 py-2 text-sm"
+              >
+                <span className="text-neutral-400 line-through">
+                  #{p.jerseyNumber ?? '—'} {p.fullName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleParticipation(p.matchPlayerStatId, true)}
+                  className="rounded-lg border border-neutral-300 px-2 py-1 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+                >
+                  Reincorporar
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
