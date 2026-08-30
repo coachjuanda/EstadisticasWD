@@ -5,9 +5,12 @@ export async function buildAthleteProfileExcel(athlete: AthleteProfileData): Pro
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Hockey.One';
 
-  const scopeLabel = athlete.selectedTournamentId
+  const tournamentLabel = athlete.selectedTournamentId
     ? athlete.tournamentsPlayed.find((t) => t.id === athlete.selectedTournamentId)?.name ?? '—'
-    : 'Acumulado (toda su historia)';
+    : 'Acumulado';
+  const scopeLabel = athlete.selectedSportLabel
+    ? `${athlete.selectedSportLabel} · ${tournamentLabel}`
+    : 'Sin actividad registrada';
 
   const sheet = workbook.addWorksheet('Perfil');
   sheet.addRow([athlete.fullName]);

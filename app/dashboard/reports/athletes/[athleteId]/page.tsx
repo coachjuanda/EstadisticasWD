@@ -12,22 +12,37 @@ function monthLabel(month: string) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+// Arma el query string preservando el deporte activo -- así cambiar de
+// torneo o de mes de asistencia nunca hace "saltar" de deporte por accidente.
+function buildAthleteQuery(params: { sport?: string | null; tournament_id?: string | null; attendance_month?: string | null }) {
+  const qs = new URLSearchParams();
+  if (params.sport) qs.set('sport', params.sport);
+  if (params.tournament_id) qs.set('tournament_id', params.tournament_id);
+  if (params.attendance_month) qs.set('attendance_month', params.attendance_month);
+  const s = qs.toString();
+  return s ? `?${s}` : '';
+}
+
 export default async function AthleteProfilePage({
   params,
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ tournament_id?: string; attendance_month?: string }>;
+  searchParams: Promise<{ sport?: string; tournament_id?: string; attendance_month?: string }>;
 }) {
   const { athleteId } = await params;
-  const { tournament_id: tournamentFilter, attendance_month: attendanceMonthFilter } = await searchParams;
+  const {
+    sport: sportFilter,
+    tournament_id: tournamentFilter,
+    attendance_month: attendanceMonthFilter,
+  } = await searchParams;
   const supabase = await createClient();
 
-  const result = await loadAthleteProfile(supabase, athleteId, tournamentFilter, attendanceMonthFilter);
+  const result = await loadAthleteProfile(supabase, athleteId, tournamentFilter, attendanceMonthFilter, sportFilter);
   if (!result.ok) redirect('/dashboard?error=unauthorized');
   const athlete = result.data;
 
-  const exportQuery = tournamentFilter ? `?tournament_id=${tournamentFilter}` : '';
+  const exportQuery = buildAthleteQuery({ sport: athlete.selectedSport, tournament_id: athlete.selectedTournamentId });
 
   return (
     <div className="mx-auto w-full max-w-2xl p-6">
@@ -58,17 +73,35 @@ export default async function AthleteProfilePage({
         )}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+      {athlete.availableSports.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+          {athlete.availableSports.map((s) => (
+            <a
+              key={s.sport}
+              href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: s.sport })}`}
+              className={
+                athlete.selectedSport === s.sport
+                  ? 'rounded-full bg-brand-blue px-3 py-1 font-semibold text-white'
+                  : 'rounded-full border border-neutral-300 px-3 py-1 text-neutral-600 hover:bg-neutral-100'
+              }
+            >
+              {s.label}
+            </a>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2 text-sm">
         <a
-          href={`/dashboard/reports/athletes/${athleteId}`}
+          href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport })}`}
           className={!tournamentFilter ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
         >
-          Acumulado (toda su historia)
+          Acumulado
         </a>
         {athlete.tournamentsPlayed.map((t) => (
           <a
             key={t.id}
-            href={`/dashboard/reports/athletes/${athleteId}?tournament_id=${t.id}`}
+            href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport, tournament_id: t.id })}`}
             className={tournamentFilter === t.id ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
           >
             {t.name}
@@ -93,6 +126,7 @@ export default async function AthleteProfilePage({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-neutral-700">Asistencia a entrenamientos</h2>
             <form method="GET" className="flex items-end gap-2">
+              {athlete.selectedSport && <input type="hidden" name="sport" value={athlete.selectedSport} />}
               {tournamentFilter && <input type="hidden" name="tournament_id" value={tournamentFilter} />}
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-neutral-500" htmlFor="attendance-month">

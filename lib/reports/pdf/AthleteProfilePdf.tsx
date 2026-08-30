@@ -14,9 +14,12 @@ const styles = StyleSheet.create({
 });
 
 export function AthleteProfilePdf({ athlete }: { athlete: AthleteProfileData }) {
-  const scopeLabel = athlete.selectedTournamentId
+  const tournamentLabel = athlete.selectedTournamentId
     ? athlete.tournamentsPlayed.find((t) => t.id === athlete.selectedTournamentId)?.name ?? '—'
-    : 'Acumulado (toda su historia)';
+    : 'Acumulado';
+  const scopeLabel = athlete.selectedSportLabel
+    ? `${athlete.selectedSportLabel} · ${tournamentLabel}`
+    : 'Sin actividad registrada';
 
   return (
     <Document>

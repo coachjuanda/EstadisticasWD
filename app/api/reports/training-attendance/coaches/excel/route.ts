@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     dateFrom: params.get('date_from') ?? undefined,
     dateTo: params.get('date_to') ?? undefined,
     coachId: params.get('coach_id') ?? undefined,
+    sport: params.get('sport') ?? undefined,
   });
   if (!result.ok) {
     return new Response('No autorizado', { status: 403 });

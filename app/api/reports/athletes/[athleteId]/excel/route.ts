@@ -4,10 +4,12 @@ import { buildAthleteProfileExcel } from '@/lib/reports/excel/athleteProfileExce
 
 export async function GET(request: Request, { params }: { params: Promise<{ athleteId: string }> }) {
   const { athleteId } = await params;
-  const tournamentId = new URL(request.url).searchParams.get('tournament_id') ?? undefined;
+  const searchParams = new URL(request.url).searchParams;
+  const tournamentId = searchParams.get('tournament_id') ?? undefined;
+  const sport = searchParams.get('sport') ?? undefined;
   const supabase = await createClient();
 
-  const result = await loadAthleteProfile(supabase, athleteId, tournamentId);
+  const result = await loadAthleteProfile(supabase, athleteId, tournamentId, undefined, sport);
   if (!result.ok) {
     return new Response('No autorizado', { status: result.reason === 'not_found' ? 404 : 403 });
   }
