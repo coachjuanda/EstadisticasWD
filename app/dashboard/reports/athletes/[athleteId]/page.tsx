@@ -73,56 +73,11 @@ export default async function AthleteProfilePage({
         )}
       </p>
 
-      {athlete.availableSports.length > 1 && (
-        <div className="mt-4 flex flex-wrap gap-2 text-sm">
-          {athlete.availableSports.map((s) => (
-            <a
-              key={s.sport}
-              href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: s.sport })}`}
-              className={
-                athlete.selectedSport === s.sport
-                  ? 'rounded-full bg-brand-blue px-3 py-1 font-semibold text-white'
-                  : 'rounded-full border border-neutral-300 px-3 py-1 text-neutral-600 hover:bg-neutral-100'
-              }
-            >
-              {s.label}
-            </a>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-3 flex flex-wrap gap-2 text-sm">
-        <a
-          href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport })}`}
-          className={!tournamentFilter ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
-        >
-          Acumulado
-        </a>
-        {athlete.tournamentsPlayed.map((t) => (
-          <a
-            key={t.id}
-            href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport, tournament_id: t.id })}`}
-            className={tournamentFilter === t.id ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
-          >
-            {t.name}
-          </a>
-        ))}
-      </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {athlete.statCards.map((s) => (
-          <div key={s.key} className="rounded-xl border border-neutral-200 p-3 text-center">
-            <p className="text-xs text-neutral-500">{s.label}</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-neutral-900">{s.value}</p>
-          </div>
-        ))}
-        {athlete.matchesInScope === 0 && (
-          <p className="col-span-full text-sm text-neutral-500">Sin partidos registrados en esta vista.</p>
-        )}
-      </div>
-
+      {/* Asistencia a entrenamientos: un solo número, independiente de las
+          tabs de deporte de más abajo -- un entrenamiento convoca a toda una
+          categoría sin distinguir en qué deporte compite cada deportista. */}
       {athlete.attendancePct !== null && (
-        <div className="mt-8">
+        <div className="mt-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-neutral-700">Asistencia a entrenamientos</h2>
             <form method="GET" className="flex items-end gap-2">
@@ -192,6 +147,54 @@ export default async function AthleteProfilePage({
           </div>
         </div>
       )}
+
+      {athlete.availableSports.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+          {athlete.availableSports.map((s) => (
+            <a
+              key={s.sport}
+              href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: s.sport })}`}
+              className={
+                athlete.selectedSport === s.sport
+                  ? 'rounded-full bg-brand-blue px-3 py-1 font-semibold text-white'
+                  : 'rounded-full border border-neutral-300 px-3 py-1 text-neutral-600 hover:bg-neutral-100'
+              }
+            >
+              {s.label}
+            </a>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap gap-2 text-sm">
+        <a
+          href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport })}`}
+          className={!tournamentFilter ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
+        >
+          Acumulado
+        </a>
+        {athlete.tournamentsPlayed.map((t) => (
+          <a
+            key={t.id}
+            href={`/dashboard/reports/athletes/${athleteId}${buildAthleteQuery({ sport: athlete.selectedSport, tournament_id: t.id })}`}
+            className={tournamentFilter === t.id ? 'font-semibold text-brand-blue' : 'text-neutral-500 hover:underline'}
+          >
+            {t.name}
+          </a>
+        ))}
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {athlete.statCards.map((s) => (
+          <div key={s.key} className="rounded-xl border border-neutral-200 p-3 text-center">
+            <p className="text-xs text-neutral-500">{s.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-neutral-900">{s.value}</p>
+          </div>
+        ))}
+        {athlete.matchesInScope === 0 && (
+          <p className="col-span-full text-sm text-neutral-500">Sin partidos registrados en esta vista.</p>
+        )}
+      </div>
 
       {athlete.teamMemberships.length > 0 && (
         <div className="mt-8">

@@ -24,7 +24,6 @@ export async function buildTrainingAttendanceAthletesExcel(data: AthleteTraining
   sheet.addRow(['Rango', rangeLabel(meta.dateFrom, meta.dateTo)]);
   if (meta.divisionNames.length > 0) sheet.addRow(['Divisiones', meta.divisionNames.join(', ')]);
   if (meta.athleteName) sheet.addRow(['Deportista', meta.athleteName]);
-  if (meta.sportLabel) sheet.addRow(['Deporte', meta.sportLabel]);
   sheet.addRow([]);
 
   if (meta.athleteName) {
@@ -34,10 +33,10 @@ export async function buildTrainingAttendanceAthletesExcel(data: AthleteTraining
       sheet.addRow([formatDate(d.scheduledAt), d.divisionNames, d.present ? 'Presente' : 'Ausente']);
     }
   } else {
-    sheet.addRow(['Deportista', 'Deporte', 'Convocatorias', 'Presentes', '%']);
+    sheet.addRow(['Deportista', 'Convocatorias', 'Presentes', '%']);
     sheet.getRow(sheet.lastRow!.number).font = { bold: true };
     for (const a of summary) {
-      sheet.addRow([a.fullName, a.sportLabel, a.total, a.present, `${a.pct}%`]);
+      sheet.addRow([a.fullName, a.total, a.present, `${a.pct}%`]);
     }
   }
   sheet.getColumn(1).width = 30;
@@ -59,7 +58,6 @@ export async function buildTrainingAttendanceCoachesExcel(data: CoachTrainingAtt
   sheet.getRow(1).font = { bold: true, size: 14 };
   sheet.addRow(['Rango', rangeLabel(meta.dateFrom, meta.dateTo)]);
   if (meta.coachName) sheet.addRow(['Entrenador', meta.coachName]);
-  if (meta.sportLabel) sheet.addRow(['Deporte', meta.sportLabel]);
   sheet.addRow([]);
 
   if (meta.coachName) {
@@ -69,10 +67,10 @@ export async function buildTrainingAttendanceCoachesExcel(data: CoachTrainingAtt
       sheet.addRow([formatDate(d.scheduledAt), d.divisionNames]);
     }
   } else {
-    sheet.addRow(['Entrenador', 'Deporte', 'Sesiones presente']);
+    sheet.addRow(['Entrenador', 'Sesiones presente']);
     sheet.getRow(sheet.lastRow!.number).font = { bold: true };
     for (const c of summary) {
-      sheet.addRow([c.fullName, c.sportLabel, c.sessionsPresent]);
+      sheet.addRow([c.fullName, c.sessionsPresent]);
     }
   }
   sheet.getColumn(1).width = 30;

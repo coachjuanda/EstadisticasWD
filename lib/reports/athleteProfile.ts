@@ -212,13 +212,13 @@ export async function loadAthleteProfile(
     statCards.push({ key: 'save_pct', label: 'SV%', value: savePct !== null ? `${savePct}%` : '—' });
   }
 
-  // Asistencia a entrenamientos -- igual que las stats de partido, se acota
-  // al deporte seleccionado (una sesión pertenece a un deporte a través de
-  // la(s) división(es) que la componen). No se filtra por tournamentFilter
-  // porque el entrenamiento no pertenece a un torneo.
+  // Asistencia a entrenamientos -- independiente de torneo/temporada Y de
+  // deporte (no se filtra por tournamentFilter ni por selectedSport): un
+  // entrenamiento convoca a toda una categoría sin distinguir en qué deporte
+  // compite cada deportista, así que es un solo número, no uno por deporte.
   const { data: attendanceRows } = await supabase
     .from('training_attendance')
-    .select('id, present, training_sessions(scheduled_at, training_session_divisions(divisions(name, sport)))')
+    .select('id, present, training_sessions(scheduled_at, training_session_divisions(divisions(name)))')
     .eq('athlete_id', athleteId)
     .returns<
       {
@@ -226,17 +226,12 @@ export async function loadAthleteProfile(
         present: boolean;
         training_sessions: {
           scheduled_at: string;
-          training_session_divisions: { divisions: { name: string; sport: string | null } | null }[];
+          training_session_divisions: { divisions: { name: string } | null }[];
         } | null;
       }[]
     >();
 
-  const attendanceAll = (attendanceRows ?? []).filter((r) => r.training_sessions !== null);
-  const attendance = selectedSport
-    ? attendanceAll.filter((r) =>
-        r.training_sessions!.training_session_divisions.some((d) => d.divisions?.sport === selectedSport)
-      )
-    : [];
+  const attendance = (attendanceRows ?? []).filter((r) => r.training_sessions !== null);
   const attendanceTotal = attendance.length;
   const attendancePresent = attendance.filter((r) => r.present).length;
   const attendancePct = attendanceTotal > 0 ? Math.round((attendancePresent / attendanceTotal) * 100) : null;

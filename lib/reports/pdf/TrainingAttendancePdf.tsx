@@ -31,7 +31,7 @@ export function TrainingAttendanceAthletesPdf({ data }: { data: AthleteTrainingA
   const { summary, detail, meta } = data;
   const subtitleParts = [rangeLabel(meta.dateFrom, meta.dateTo)];
   if (meta.divisionNames.length > 0) subtitleParts.push(meta.divisionNames.join(', '));
-  if (meta.athleteName) subtitleParts.push(meta.sportLabel ? `${meta.athleteName} (${meta.sportLabel})` : meta.athleteName);
+  if (meta.athleteName) subtitleParts.push(meta.athleteName);
 
   return (
     <Document>
@@ -61,15 +61,13 @@ export function TrainingAttendanceAthletesPdf({ data }: { data: AthleteTrainingA
           <View style={styles.section}>
             <View style={styles.headerRow}>
               <Text style={styles.headerNameCell}>Deportista</Text>
-              <Text style={styles.headerCell}>Deporte</Text>
               <Text style={styles.headerCell}>Convocatorias</Text>
               <Text style={styles.headerCell}>Presentes</Text>
               <Text style={styles.headerCell}>%</Text>
             </View>
             {summary.map((a) => (
-              <View key={`${a.athleteId}::${a.sport ?? 'none'}`} style={styles.row}>
+              <View key={a.athleteId} style={styles.row}>
                 <Text style={styles.nameCell}>{a.fullName}</Text>
-                <Text style={styles.cell}>{a.sportLabel}</Text>
                 <Text style={styles.cell}>{a.total}</Text>
                 <Text style={styles.cell}>{a.present}</Text>
                 <Text style={styles.cell}>{a.pct}%</Text>
@@ -88,7 +86,7 @@ export function TrainingAttendanceAthletesPdf({ data }: { data: AthleteTrainingA
 export function TrainingAttendanceCoachesPdf({ data }: { data: CoachTrainingAttendanceData }) {
   const { summary, detail, meta } = data;
   const subtitleParts = [rangeLabel(meta.dateFrom, meta.dateTo)];
-  if (meta.coachName) subtitleParts.push(meta.sportLabel ? `${meta.coachName} (${meta.sportLabel})` : meta.coachName);
+  if (meta.coachName) subtitleParts.push(meta.coachName);
 
   return (
     <Document>
@@ -113,13 +111,11 @@ export function TrainingAttendanceCoachesPdf({ data }: { data: CoachTrainingAtte
           <View style={styles.section}>
             <View style={styles.headerRow}>
               <Text style={styles.headerNameCell}>Entrenador</Text>
-              <Text style={styles.headerCell}>Deporte</Text>
               <Text style={styles.headerCell}>Sesiones presente</Text>
             </View>
             {summary.map((c) => (
-              <View key={`${c.coachId}::${c.sport ?? 'none'}`} style={styles.row}>
+              <View key={c.coachId} style={styles.row}>
                 <Text style={styles.nameCell}>{c.fullName}</Text>
-                <Text style={styles.cell}>{c.sportLabel}</Text>
                 <Text style={styles.cell}>{c.sessionsPresent}</Text>
               </View>
             ))}

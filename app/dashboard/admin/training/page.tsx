@@ -16,7 +16,6 @@ function buildQuery(parts: {
   date_to?: string;
   athlete_id?: string;
   coach_id?: string;
-  sport?: string;
 }) {
   const qs = new URLSearchParams();
   for (const d of parts.divisionIds ?? []) qs.append('division_id', d);
@@ -24,7 +23,6 @@ function buildQuery(parts: {
   if (parts.date_to) qs.set('date_to', parts.date_to);
   if (parts.athlete_id) qs.set('athlete_id', parts.athlete_id);
   if (parts.coach_id) qs.set('coach_id', parts.coach_id);
-  if (parts.sport) qs.set('sport', parts.sport);
   return qs.toString();
 }
 
@@ -37,10 +35,9 @@ export default async function AdminTrainingPage({
     date_to?: string;
     athlete_id?: string;
     coach_id?: string;
-    sport?: string;
   }>;
 }) {
-  const { division_id, date_from, date_to, athlete_id, coach_id, sport } = await searchParams;
+  const { division_id, date_from, date_to, athlete_id, coach_id } = await searchParams;
   const divisionIds = toArray(division_id);
   const supabase = await createClient();
 
@@ -52,8 +49,8 @@ export default async function AdminTrainingPage({
       .eq('role', 'deportista')
       .order('full_name')
       .returns<PersonOption[]>(),
-    loadAthleteTrainingAttendance(supabase, { divisionIds, dateFrom: date_from, dateTo: date_to, athleteId: athlete_id, sport }),
-    loadCoachTrainingAttendance(supabase, { dateFrom: date_from, dateTo: date_to, coachId: coach_id, sport }),
+    loadAthleteTrainingAttendance(supabase, { divisionIds, dateFrom: date_from, dateTo: date_to, athleteId: athlete_id }),
+    loadCoachTrainingAttendance(supabase, { dateFrom: date_from, dateTo: date_to, coachId: coach_id }),
   ]);
 
   if (!athleteResult.ok || !coachResult.ok) redirect('/dashboard?error=unauthorized');
@@ -63,8 +60,8 @@ export default async function AdminTrainingPage({
 
   const hasFilters = Boolean(divisionIds.length > 0 || date_from || date_to || athlete_id);
 
-  const athletesExportQuery = buildQuery({ divisionIds, date_from, date_to, athlete_id, sport });
-  const coachesExportQuery = buildQuery({ date_from, date_to, coach_id, sport });
+  const athletesExportQuery = buildQuery({ divisionIds, date_from, date_to, athlete_id });
+  const coachesExportQuery = buildQuery({ date_from, date_to, coach_id });
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -175,9 +172,7 @@ export default async function AdminTrainingPage({
             ← Volver al resumen de deportistas
           </a>
           <h3 className="mt-2 text-sm font-semibold text-neutral-700">
-            {athleteResult.data.meta.athleteName ?? athletes?.find((a) => a.id === athlete_id)?.full_name ?? 'Deportista'}
-            {athleteResult.data.meta.sportLabel ? ` (${athleteResult.data.meta.sportLabel})` : ''} —{' '}
-            {detail.length > 0 ? Math.round((detail.filter((d) => d.present).length / detail.length) * 100) : 0}% de asistencia
+            {athletes?.find((a) => a.id === athlete_id)?.full_name ?? 'Deportista'} — {detail.length > 0 ? Math.round((detail.filter((d) => d.present).length / detail.length) * 100) : 0}% de asistencia
           </h3>
           <div className="mt-3 flex flex-col gap-2">
             {detail.map((d) => (
@@ -205,7 +200,6 @@ export default async function AdminTrainingPage({
             <thead>
               <tr className="border-b border-neutral-200 text-left text-neutral-500">
                 <th className="px-3 py-2 font-medium">Deportista</th>
-                <th className="px-3 py-2 font-medium">Deporte</th>
                 <th className="px-3 py-2 text-right font-medium">Convocatorias</th>
                 <th className="px-3 py-2 text-right font-medium">Presentes</th>
                 <th className="px-3 py-2 text-right font-medium">%</th>
@@ -213,16 +207,15 @@ export default async function AdminTrainingPage({
             </thead>
             <tbody>
               {summary.map((a) => (
-                <tr key={`${a.athleteId}::${a.sport ?? 'none'}`} className="border-b border-neutral-100">
+                <tr key={a.athleteId} className="border-b border-neutral-100">
                   <td className="px-3 py-2">
                     <a
-                      href={`/dashboard/admin/training?${buildQuery({ divisionIds, date_from, date_to, athlete_id: a.athleteId, sport: a.sport ?? undefined })}`}
+                      href={`/dashboard/admin/training?${buildQuery({ divisionIds, date_from, date_to, athlete_id: a.athleteId })}`}
                       className="text-brand-blue hover:underline"
                     >
                       {a.fullName}
                     </a>
                   </td>
-                  <td className="px-3 py-2 text-neutral-600">{a.sportLabel}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{a.total}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{a.present}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{a.pct}%</td>
@@ -266,9 +259,7 @@ export default async function AdminTrainingPage({
             ← Volver al resumen de entrenadores
           </a>
           <h3 className="mt-2 text-sm font-semibold text-neutral-700">
-            {coachResult.data.meta.coachName ?? coachSummary.find((c) => c.coachId === coach_id)?.fullName ?? 'Entrenador'}
-            {coachResult.data.meta.sportLabel ? ` (${coachResult.data.meta.sportLabel})` : ''} — {coachDetail.length} sesión
-            {coachDetail.length === 1 ? '' : 'es'}
+            {coachSummary.find((c) => c.coachId === coach_id)?.fullName ?? 'Entrenador'} — {coachDetail.length} sesión{coachDetail.length === 1 ? '' : 'es'}
           </h3>
           <div className="mt-3 flex flex-col gap-2">
             {coachDetail.map((d) => (
@@ -295,22 +286,20 @@ export default async function AdminTrainingPage({
             <thead>
               <tr className="border-b border-neutral-200 text-left text-neutral-500">
                 <th className="px-3 py-2 font-medium">Entrenador</th>
-                <th className="px-3 py-2 font-medium">Deporte</th>
                 <th className="px-3 py-2 text-right font-medium">Sesiones presente</th>
               </tr>
             </thead>
             <tbody>
               {coachSummary.map((c) => (
-                <tr key={`${c.coachId}::${c.sport ?? 'none'}`} className="border-b border-neutral-100">
+                <tr key={c.coachId} className="border-b border-neutral-100">
                   <td className="px-3 py-2">
                     <a
-                      href={`/dashboard/admin/training?${buildQuery({ date_from, date_to, coach_id: c.coachId, sport: c.sport ?? undefined })}`}
+                      href={`/dashboard/admin/training?${buildQuery({ date_from, date_to, coach_id: c.coachId })}`}
                       className="text-brand-blue hover:underline"
                     >
                       {c.fullName}
                     </a>
                   </td>
-                  <td className="px-3 py-2 text-neutral-600">{c.sportLabel}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-semibold">{c.sessionsPresent}</td>
                 </tr>
               ))}
