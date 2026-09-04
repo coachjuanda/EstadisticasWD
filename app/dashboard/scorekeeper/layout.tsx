@@ -1,22 +1,9 @@
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/lib/auth/activeMembership';
 
 export default async function ScorekeeperLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-
-  if (profile?.role !== 'scorekeeper') {
-    redirect('/dashboard?error=unauthorized');
-  }
+  await requireRole(supabase, 'scorekeeper');
 
   return <div className="min-h-full flex-1 bg-neutral-50">{children}</div>;
 }

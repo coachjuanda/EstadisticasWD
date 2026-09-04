@@ -1,18 +1,11 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/lib/auth/activeMembership';
 import { BulkUploadClient } from './BulkUploadClient';
 
 export default async function BulkMatchesUploadPage() {
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') redirect('/dashboard?error=unauthorized');
+  await requireRole(supabase, 'admin');
 
   return (
     <div className="mx-auto max-w-3xl">

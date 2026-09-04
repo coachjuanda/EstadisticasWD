@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import { computeDueStatus } from '@/lib/evaluations/dueStatus';
 import { CoachEvaluationsTable, type AthleteEvalRow } from './CoachEvaluationsTable';
 
@@ -25,16 +26,16 @@ export default async function CoachEvaluationsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: coachTeams }, { data: profile }] = await Promise.all([
+  const [{ data: coachTeams }, membership] = await Promise.all([
     supabase.from('coach_teams').select('team_id').eq('coach_id', user!.id),
-    supabase.from('profiles').select('club_id').eq('id', user!.id).single(),
+    getActiveMembership(supabase),
   ]);
   const teamIds = (coachTeams ?? []).map((t) => t.team_id);
 
   const { data: club } = await supabase
     .from('clubs')
     .select('evaluation_deadline')
-    .eq('id', profile?.club_id as string)
+    .eq('id', membership?.clubId as string)
     .maybeSingle();
   const evaluationDeadline = club?.evaluation_deadline ?? null;
 

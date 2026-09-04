@@ -1,16 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import { toCsv } from '@/lib/csv';
 
 export async function GET() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return new Response('No autorizado', { status: 401 });
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return new Response('No autorizado', { status: 403 });
+  const membership = await getActiveMembership(supabase);
+  if (!membership) return new Response('No autorizado', { status: 401 });
+  if (membership.role !== 'admin') return new Response('No autorizado', { status: 403 });
 
   const csv = toCsv([
     ['torneo', 'equipo_local', 'rival', 'fecha_hora', 'cancha_ubicacion', 'scorekeeper'],

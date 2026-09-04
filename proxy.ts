@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // estándar de @supabase/ssr para que el access token no expire a mitad de
 // una visita sin que ningún Server Component lo note.
 //
-// Además, revisa profiles.status en cada request (no solo al login, como
+// Además, revisa people.status en cada request (no solo al login, como
 // hacía antes /api/login). Antes de esto, un admin marcando a alguien
 // "inactivo" no tenía efecto hasta que a esa persona se le venciera el
 // access token y tuviera que volver a iniciar sesión -- con sesiones de
@@ -41,13 +41,13 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
+  const { data: person } = await supabase
+    .from('people')
     .select('status')
     .eq('id', user.id)
     .maybeSingle();
 
-  if (profile?.status !== 'activo') {
+  if (person?.status !== 'activo') {
     await supabase.auth.signOut();
 
     const loginUrl = new URL('/login', request.url);

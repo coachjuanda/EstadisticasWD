@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import { InstallAppCard } from './InstallAppCard';
 
 export default async function DashboardPage({
@@ -12,19 +13,11 @@ export default async function DashboardPage({
   const { error } = await searchParams;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const membership = await getActiveMembership(supabase);
 
-  if (!user) {
+  if (!membership) {
     redirect('/login');
   }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .single();
 
   return (
     <main className="flex min-h-full flex-1 items-center justify-center bg-white px-4">
@@ -45,12 +38,12 @@ export default async function DashboardPage({
           </p>
         )}
         <h1 className="text-2xl font-semibold text-neutral-900">
-          Bienvenido, {profile?.full_name ?? user.email}
+          Bienvenido, {membership.fullName}
         </h1>
         <p className="mt-2 text-sm text-neutral-500">
-          Rol: {profile?.role ?? 'desconocido'}
+          Rol: {membership.role ?? 'desconocido'}
         </p>
-        {profile?.role === 'admin' && (
+        {membership.role === 'admin' && (
           <Link
             href="/dashboard/admin/divisions"
             className="mt-6 inline-block rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange-hover"
@@ -58,7 +51,7 @@ export default async function DashboardPage({
             Ir al panel de administración
           </Link>
         )}
-        {profile?.role === 'scorekeeper' && (
+        {membership.role === 'scorekeeper' && (
           <Link
             href="/dashboard/scorekeeper"
             className="mt-6 inline-block rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange-hover"
@@ -66,7 +59,7 @@ export default async function DashboardPage({
             Ver mis partidos
           </Link>
         )}
-        {profile?.role === 'coach' && (
+        {membership.role === 'coach' && (
           <div className="mt-6 flex justify-center gap-3">
             <Link
               href="/dashboard/coach/evaluations"
@@ -88,7 +81,7 @@ export default async function DashboardPage({
             </Link>
           </div>
         )}
-        {profile?.role === 'deportista' && (
+        {membership.role === 'deportista' && (
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               href="/dashboard/athlete/evaluations"

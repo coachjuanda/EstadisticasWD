@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import type { LoadResult } from '../reports/matchBoxScore';
 
 export type TeamStatDef = {
@@ -68,7 +69,7 @@ export async function loadTeamStats(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'unauthorized' };
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const membership = await getActiveMembership(supabase);
 
   const { data: team } = await supabase
     .from('teams')
@@ -80,9 +81,9 @@ export async function loadTeamStats(
 
   // Control de acceso: admin ve cualquier equipo de su club, coach solo los
   // suyos (coach_teams), deportista solo el equipo de su propia nómina.
-  if (profile?.role === 'admin') {
+  if (membership?.role === 'admin') {
     // ok
-  } else if (profile?.role === 'coach') {
+  } else if (membership?.role === 'coach') {
     const { data: ct } = await supabase
       .from('coach_teams')
       .select('team_id')
@@ -90,7 +91,7 @@ export async function loadTeamStats(
       .eq('team_id', teamId)
       .maybeSingle();
     if (!ct) return { ok: false, reason: 'unauthorized' };
-  } else if (profile?.role === 'deportista') {
+  } else if (membership?.role === 'deportista') {
     const { data: rp } = await supabase
       .from('roster_players')
       .select('id, rosters!inner(team_id)')
@@ -128,8 +129,8 @@ export async function loadTeamStats(
         summary: { matchesPlayed: 0, wins: 0, losses: 0, ties: 0, goalsFor: 0, goalsAgainst: 0, topStats: [] },
         statDefs: [],
         matches: [],
-        viewerRole: profile?.role ?? '',
-        viewerAthleteId: profile?.role === 'deportista' ? user.id : null,
+        viewerRole: membership?.role ?? '',
+        viewerAthleteId: membership?.role === 'deportista' ? user.id : null,
         rosterId: null,
         seasonFieldPlayers: [],
         seasonGoalies: [],
@@ -363,8 +364,8 @@ export async function loadTeamStats(
       },
       statDefs,
       matches: points,
-      viewerRole: profile?.role ?? '',
-      viewerAthleteId: profile?.role === 'deportista' ? user.id : null,
+      viewerRole: membership?.role ?? '',
+      viewerAthleteId: membership?.role === 'deportista' ? user.id : null,
       rosterId: roster?.id ?? null,
       seasonFieldPlayers,
       seasonGoalies,

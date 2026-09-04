@@ -64,7 +64,7 @@ export default async function EvaluationDetailPage({
     redirect('/dashboard?error=unauthorized');
   }
 
-  // profiles.coach_id no se puede embeber directo: profiles solo se puede
+  // people vía coach_id no se puede embeber directo: people solo se puede
   // leer completo si eres tú mismo o admin. coach_names es la vista reducida
   // (solo id + nombre) que cualquier miembro del club sí puede consultar.
   const { data: coach } = await supabase

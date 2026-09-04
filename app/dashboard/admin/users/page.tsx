@@ -2,14 +2,16 @@ import { createClient } from '@/lib/supabase/server';
 import { CreateUserForm } from './CreateUserForm';
 import { UsersTable } from './UsersTable';
 
-type ProfileQueryRow = {
-  id: string;
-  full_name: string;
-  cedula: string;
-  email: string;
+type MembershipQueryRow = {
   role: string;
-  status: string;
-  athlete_profiles: { position: string | null } | null;
+  people: {
+    id: string;
+    full_name: string;
+    cedula: string;
+    email: string;
+    status: string;
+    athlete_profiles: { position: string | null } | null;
+  } | null;
 };
 
 type TeamRow = { id: string; name: string; divisions: { name: string } | null };
@@ -30,30 +32,57 @@ export default async function UsersPage({
   const { error, edit, assign, role: roleFilter } = await searchParams;
   const supabase = await createClient();
 
-  let profilesQuery = supabase
-    .from('profiles')
-    .select('id, full_name, cedula, email, role, status, athlete_profiles(position)')
-    .order('full_name');
-
-  if (roleFilter) {
-    profilesQuery = profilesQuery.eq('role', roleFilter);
-  }
-
-  const [{ data: profiles }, { data: teams }, { data: coachTeams }] = await Promise.all([
-    profilesQuery.returns<ProfileQueryRow[]>(),
+  // Hint !memberships_person_id_fkey obligatorio -- memberships y people
+  // tienen 2 relaciones (ver también lib/auth/activeMembership.ts), y sin
+  // desambiguar PostgREST rechaza el embed con PGRST201.
+  //
+  // Sin filtro por rol acá a propósito: una persona con 2+ roles necesita
+  // traer TODAS sus membresías para mostrarse en una sola fila con todas sus
+  // etiquetas, así que el filtro de la UI se aplica después de agrupar, no
+  // en la query (el club es chico, filtrar en memoria no pesa).
+  const [{ data: memberships }, { data: teams }, { data: coachTeams }] = await Promise.all([
+    supabase
+      .from('memberships')
+      .select('role, people!memberships_person_id_fkey(id, full_name, cedula, email, status, athlete_profiles(position))')
+      .order('full_name', { referencedTable: 'people' })
+      .returns<MembershipQueryRow[]>(),
     supabase.from('teams').select('id, name, divisions(name)').order('name').returns<TeamRow[]>(),
     supabase.from('coach_teams').select('coach_id, team_id'),
   ]);
 
-  const profileList = (profiles ?? []).map((p) => ({
-    id: p.id,
-    full_name: p.full_name,
-    cedula: p.cedula,
-    email: p.email,
-    role: p.role,
-    status: p.status,
-    position: p.athlete_profiles?.position ?? null,
-  }));
+  // Una fila por PERSONA (no por membership): agrupa todos los roles de cada
+  // quien en el mismo registro, en vez de mostrarla duplicada una vez por
+  // rol -- confuso en cuanto alguien tiene 2+ roles, que ya es el caso real
+  // para varias personas del club.
+  type Person = {
+    id: string;
+    full_name: string;
+    cedula: string;
+    email: string;
+    roles: string[];
+    status: string;
+    position: string | null;
+  };
+  const peopleById = new Map<string, Person>();
+  for (const m of memberships ?? []) {
+    if (!m.people) continue;
+    const existing = peopleById.get(m.people.id);
+    if (existing) {
+      existing.roles.push(m.role);
+    } else {
+      peopleById.set(m.people.id, {
+        id: m.people.id,
+        full_name: m.people.full_name,
+        cedula: m.people.cedula,
+        email: m.people.email,
+        roles: [m.role],
+        status: m.people.status,
+        position: m.people.athlete_profiles?.position ?? null,
+      });
+    }
+  }
+
+  const profileList = Array.from(peopleById.values()).filter((p) => !roleFilter || p.roles.includes(roleFilter));
 
   const teamList = teams ?? [];
   const teamOptions = teamList.map((t) => ({ id: t.id, name: t.name, divisionName: t.divisions?.name ?? null }));

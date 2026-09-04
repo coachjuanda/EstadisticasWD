@@ -3,20 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/lib/auth/activeMembership';
 
 const BASE_PATH = '/dashboard/admin/evaluations';
 
 async function requireAdmin() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await requireRole(supabase, 'admin');
 
-  const { data: profile } = await supabase.from('profiles').select('role, club_id').eq('id', user.id).single();
-  if (profile?.role !== 'admin') redirect('/dashboard?error=unauthorized');
-
-  return { supabase, clubId: profile.club_id as string };
+  return { supabase, clubId: membership.clubId };
 }
 
 // Se reutiliza tanto para fijar como para quitar la fecha: un valor vacío

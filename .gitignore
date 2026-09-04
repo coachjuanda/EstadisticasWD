@@ -36,6 +36,13 @@ yarn-error.log*
 # generated local secrets, never commit
 .admin_credentials_LOCAL.txt
 
+# datos personales reales del club (cédulas, fechas de nacimiento de
+# menores) y scripts de carga con la contraseña compartida en texto plano --
+# nunca a git, ni siquiera en un repo privado
+/Documentos WD/
+scripts/import-deportistas.mjs
+scripts/import-fixups.mjs
+
 # vercel
 .vercel
 

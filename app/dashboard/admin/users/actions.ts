@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireRole } from '@/lib/auth/activeMembership';
 import { generateTempPassword } from '@/lib/generate-password';
 import { validateManualPassword } from '@/lib/password-policy';
 
@@ -16,20 +17,9 @@ const BASE_PATH = '/dashboard/admin/users';
 // privilegiado.
 async function requireAdmin() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await requireRole(supabase, 'admin');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, club_id')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') redirect('/dashboard?error=unauthorized');
-
-  return { supabase, clubId: profile.club_id as string, adminId: user.id };
+  return { supabase, clubId: membership.clubId, adminId: membership.personId };
 }
 
 // Resuelve la contraseña a usar según el modo elegido por el admin -- nunca
@@ -183,28 +173,30 @@ export async function updateUser(formData: FormData) {
 
   const id = formData.get('id') as string;
   const full_name = (formData.get('full_name') as string)?.trim();
-  const role = formData.get('role') as string;
   const status = formData.get('status') as string;
   const position = formData.get('position') as string;
 
-  if (!id || !full_name || !role || !status) {
+  if (!id || !full_name || !status) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent('Datos incompletos.')}`);
   }
 
-  const { error } = await supabase.from('profiles').update({ full_name, role, status }).eq('id', id);
+  const { error } = await supabase.from('people').update({ full_name, status }).eq('id', id);
 
   if (error) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent(error.message)}`);
   }
 
-  // athlete_profiles.full_name se copió de profiles.full_name solo una vez,
-  // al crear la cuenta (handle_new_athlete_profile) -- sin este sync, un
-  // cambio de nombre acá nunca se reflejaría en nóminas, partidos ni la
-  // vista pública, que siempre leen de athlete_profiles.
-  if (role === 'deportista') {
+  // athlete_profiles.full_name se copió de people.full_name solo una vez, al
+  // crear la cuenta (handle_new_athlete_profile) -- sin este sync, un cambio
+  // de nombre acá nunca se reflejaría en nóminas, partidos ni la vista
+  // pública, que siempre leen de athlete_profiles. El campo "position" solo
+  // llega en el formData si la fila tiene el rol deportista entre las suyas
+  // (la UI solo lo muestra en ese caso), así que basta con chequear que
+  // llegó -- no hace falta volver a consultar los roles de la persona acá.
+  if (position) {
     const { error: athleteError } = await supabase
       .from('athlete_profiles')
-      .update({ full_name, ...(position ? { position } : {}) })
+      .update({ full_name, position })
       .eq('id', id);
 
     if (athleteError) {
@@ -223,7 +215,7 @@ const ROLE_SUBJECT_LABELS: Record<string, string> = {
   admin: 'Este usuario',
 };
 
-// Varias tablas apuntan a profiles/athlete_profiles sin ON DELETE CASCADE a
+// Varias tablas apuntan a people/athlete_profiles sin ON DELETE CASCADE a
 // propósito (match_player_stats, evaluation_reports, survey_responses,
 // matches.scorekeeper_id, stat_audit_log.changed_by, survey_templates.created_by)
 // -- son historial real, borrar el usuario no debe borrar silenciosamente ni
@@ -324,14 +316,19 @@ export async function deleteUserAction(formData: FormData) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent('No puedes eliminar tu propia cuenta.')}`);
   }
 
-  const { data: target } = await supabase.from('profiles').select('id, role').eq('id', userId).single();
-  if (!target) {
+  const { data: targetMembership } = await supabase
+    .from('memberships')
+    .select('person_id, role')
+    .eq('person_id', userId)
+    .single();
+  if (!targetMembership) {
     redirect(`${BASE_PATH}?error=${encodeURIComponent('Usuario no encontrado.')}`);
   }
+  const target = { id: targetMembership.person_id, role: targetMembership.role };
 
   if (target.role === 'admin') {
     const { count } = await supabase
-      .from('profiles')
+      .from('memberships')
       .select('id', { count: 'exact', head: true })
       .eq('club_id', clubId)
       .eq('role', 'admin');
@@ -364,6 +361,116 @@ export async function deleteUserAction(formData: FormData) {
       `${BASE_PATH}?error=${encodeURIComponent('No se pudo eliminar: tiene datos relacionados que lo impiden. Considera desactivarlo en su lugar.')}`
     );
   }
+
+  revalidatePath(BASE_PATH);
+  redirect(BASE_PATH);
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  coach: 'Entrenador',
+  scorekeeper: 'Scorekeeper',
+  deportista: 'Deportista',
+};
+
+// Agrega un rol adicional a una persona que ya existe, sin tocar su
+// membership actual (ej. alguien que ya es Deportista y ahora también
+// entrena) -- inserta una fila nueva en memberships, no reemplaza la que
+// ya tiene. Si ya tenía ese rol, la constraint unique(person_id, club_id,
+// role) lo bloquea (23505); se lo decimos con el nombre del rol en vez del
+// mensaje crudo de Postgres. No cambia active_membership_id: la persona
+// sigue entrando con el rol que tenía activo hasta que ella misma cambie
+// desde el selector/switcher.
+export async function addRoleAction(formData: FormData) {
+  const { supabase, clubId } = await requireAdmin();
+
+  const personId = formData.get('person_id') as string;
+  const role = formData.get('role') as string;
+
+  if (!personId || !role) {
+    redirect(`${BASE_PATH}?error=${encodeURIComponent('Falta la persona o el rol.')}`);
+  }
+
+  const { error } = await supabase.from('memberships').insert({ person_id: personId, club_id: clubId, role });
+
+  if (error) {
+    const roleLabel = ROLE_LABELS[role] ?? role;
+    const message =
+      error.code === '23505' ? `Esta persona ya tiene el rol ${roleLabel} en este club.` : error.message;
+    redirect(`${BASE_PATH}?error=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath(BASE_PATH);
+  redirect(BASE_PATH);
+}
+
+// Quita un rol de una persona (borra esa membership, no la persona). Dos
+// protecciones antes de borrar:
+// - no puede quedar sin ningún rol acá -- para eso está "Eliminar" (da de
+//   baja la cuenta completa); "Quitar rol" nunca deja 0 membresías.
+// - no puede quitarse el rol admin al único admin del club, mismo criterio
+//   que ya existía en deleteUserAction.
+// A diferencia de borrar la persona, quitar una membership no toca
+// evaluation_reports/training_sessions/etc. (esas tablas referencian
+// people.id, no memberships.id) -- el historial de esa persona en el rol
+// que pierde queda intacto, así que no hace falta repetir acá los chequeos
+// de getDeletionBlockReasons.
+export async function removeRoleAction(formData: FormData) {
+  const { supabase, clubId } = await requireAdmin();
+
+  const personId = formData.get('person_id') as string;
+  const role = formData.get('role') as string;
+
+  if (!personId || !role) {
+    redirect(`${BASE_PATH}?error=${encodeURIComponent('Falta la persona o el rol.')}`);
+  }
+
+  const { data: existingMemberships } = await supabase
+    .from('memberships')
+    .select('id, role')
+    .eq('person_id', personId);
+
+  if ((existingMemberships?.length ?? 0) <= 1) {
+    redirect(
+      `${BASE_PATH}?error=${encodeURIComponent('No puedes quitar el único rol de esta persona -- usa "Eliminar" si quieres darla de baja del todo.')}`
+    );
+  }
+
+  const target = existingMemberships!.find((m) => m.role === role);
+  if (!target) {
+    redirect(`${BASE_PATH}?error=${encodeURIComponent('Esta persona no tiene ese rol.')}`);
+  }
+
+  if (role === 'admin') {
+    const { count } = await supabase
+      .from('memberships')
+      .select('id', { count: 'exact', head: true })
+      .eq('club_id', clubId)
+      .eq('role', 'admin');
+    if ((count ?? 0) <= 1) {
+      redirect(
+        `${BASE_PATH}?error=${encodeURIComponent('No puedes quitar el rol de administrador al único admin del club.')}`
+      );
+    }
+  }
+
+  const { error } = await supabase.from('memberships').delete().eq('id', target!.id);
+  if (error) {
+    redirect(`${BASE_PATH}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  // people.active_membership_id -> memberships.id es ON DELETE SET NULL --
+  // si la membership borrada era la activa, la persona queda con
+  // active_membership_id null (logueada pero sin rol resuelto) hasta que
+  // alguien la arregle. Se la reasigna acá mismo a cualquiera de las que le
+  // quedan; el filtro .is(...) hace que esto sea un no-op si no era la
+  // activa (no pisa nada si ya apuntaba a otra membership).
+  const remaining = existingMemberships!.filter((m) => m.id !== target!.id);
+  await supabase
+    .from('people')
+    .update({ active_membership_id: remaining[0].id })
+    .eq('id', personId)
+    .is('active_membership_id', null);
 
   revalidatePath(BASE_PATH);
   redirect(BASE_PATH);

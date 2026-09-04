@@ -3,20 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { requireRole } from '@/lib/auth/activeMembership';
 
 const BASE_PATH = '/dashboard/coach/evaluations';
 
 async function requireCoach() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await requireRole(supabase, 'coach');
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'coach') redirect('/dashboard?error=unauthorized');
-
-  return { supabase, coachId: user.id };
+  return { supabase, coachId: membership.personId };
 }
 
 const DOFA_SPORT_PREFIXES = ['hockey_linea_', 'hockey_hielo_'];

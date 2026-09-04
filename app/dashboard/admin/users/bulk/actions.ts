@@ -1,28 +1,22 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { requireRole } from '@/lib/auth/activeMembership';
 import { generateTempPassword } from '@/lib/generate-password';
 import { parseCsv } from '@/lib/csv';
 import { validateRows, parseCsvRows, type BulkRowInput, type BulkRowValidated } from './validation';
 
 async function requireAdmin() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await requireRole(supabase, 'admin');
 
-  const { data: profile } = await supabase.from('profiles').select('role, club_id').eq('id', user.id).single();
-  if (profile?.role !== 'admin') redirect('/dashboard?error=unauthorized');
-
-  return { supabase, clubId: profile.club_id as string };
+  return { supabase, clubId: membership.clubId };
 }
 
 async function existingCedulasAndEmails(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data } = await supabase.from('profiles').select('cedula, email');
+  const { data } = await supabase.from('people').select('cedula, email');
   const cedulas = new Set((data ?? []).map((p) => p.cedula));
   const emails = new Set((data ?? []).map((p) => p.email.toLowerCase()));
   return { cedulas, emails };

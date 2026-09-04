@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getPeopleByRole } from '@/lib/auth/activeMembership';
 import { groupMatchesByTournament, indexOfMostRecentGroup } from '@/lib/matches/groupByTournament';
 import { TournamentGroupAccordion } from '../../TournamentGroupAccordion';
 import { createMatch, updateMatch, deleteMatch } from './actions';
@@ -8,7 +9,6 @@ import { ForceDeleteMatchButton } from './ForceDeleteMatchButton';
 type Tournament = { id: string; name: string };
 type TeamOption = { id: string; name: string };
 type RosterRow = { tournament_id: string; team_id: string; teams: { name: string } | null };
-type Scorekeeper = { id: string; full_name: string };
 type MatchRow = {
   id: string;
   scheduled_at: string;
@@ -57,17 +57,11 @@ export default async function MatchesPage({
   } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: tournaments }, { data: allTeams }, { data: rosters }, { data: scorekeepers }] = await Promise.all([
+  const [{ data: tournaments }, { data: allTeams }, { data: rosters }, scorekeepers] = await Promise.all([
     supabase.from('tournaments').select('id, name').order('name').returns<Tournament[]>(),
     supabase.from('teams').select('id, name').order('name').returns<TeamOption[]>(),
     supabase.from('rosters').select('tournament_id, team_id, teams(name)').returns<RosterRow[]>(),
-    supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'scorekeeper')
-      .eq('status', 'activo')
-      .order('full_name')
-      .returns<Scorekeeper[]>(),
+    getPeopleByRole(supabase, 'scorekeeper', { activeOnly: true }),
   ]);
 
   const tournamentList = tournaments ?? [];
@@ -84,7 +78,7 @@ export default async function MatchesPage({
   let matchesQuery = supabase
     .from('matches')
     .select(
-      'id, scheduled_at, location, away_team_name, status, home_team_id, tournament_id, scorekeeper_id, teams(name), tournaments(name), scorekeeper:profiles!scorekeeper_id(full_name)'
+      'id, scheduled_at, location, away_team_name, status, home_team_id, tournament_id, scorekeeper_id, teams(name), tournaments(name), scorekeeper:people!scorekeeper_id(full_name)'
     )
     .order('scheduled_at', { ascending: false });
 

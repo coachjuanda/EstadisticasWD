@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 
 const BASE_PATH = '/dashboard/admin/surveys';
 
@@ -14,13 +15,10 @@ function friendlyError(error: { code?: string; message: string }) {
 }
 
 async function getClubId(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await getActiveMembership(supabase);
+  if (!membership) redirect('/login');
 
-  const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user.id).single();
-  return { clubId: profile?.club_id as string, userId: user.id };
+  return { clubId: membership.clubId, userId: membership.personId };
 }
 
 export async function createTemplate(formData: FormData) {

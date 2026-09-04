@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getPeopleByRole } from '@/lib/auth/activeMembership';
 import { createRoster, deleteRoster, removeRosterPlayer } from './actions';
 import { AddRosterPlayersForm } from './AddRosterPlayersForm';
 
@@ -18,7 +19,6 @@ type RosterPlayerRow = {
   athlete_id: string;
   athlete_profiles: { full_name: string; position: string | null } | null;
 };
-type AthleteOption = { id: string; full_name: string; cedula: string };
 
 const POSITION_LABELS: Record<string, string> = {
   jugador_de_campo: 'Jugador de campo',
@@ -49,19 +49,14 @@ export default async function RostersPage({
   if (rosterId) {
     const roster = rosterList.find((r) => r.id === rosterId);
 
-    const [{ data: rosterPlayers }, { data: athletes }, { data: otherRosterPlayers }] = await Promise.all([
+    const [{ data: rosterPlayers }, athletes, { data: otherRosterPlayers }] = await Promise.all([
       supabase
         .from('roster_players')
         .select('id, jersey_number, athlete_id, athlete_profiles(full_name, position)')
         .eq('roster_id', rosterId)
         .order('jersey_number')
         .returns<RosterPlayerRow[]>(),
-      supabase
-        .from('profiles')
-        .select('id, full_name, cedula')
-        .eq('role', 'deportista')
-        .order('full_name')
-        .returns<AthleteOption[]>(),
+      getPeopleByRole(supabase, 'deportista'),
       // Para sugerir el número de camiseta: todas las filas de roster_players
       // del club (RLS ya las acota a "mi club"), sin importar de qué nómina
       // sean -- se usa la más reciente por deportista si tiene varias.

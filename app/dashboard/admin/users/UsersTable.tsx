@@ -4,13 +4,18 @@ import { useMemo, useState } from 'react';
 import { updateUser, assignCoachTeams } from './actions';
 import { ResetPasswordButton } from './ResetPasswordButton';
 import { DeleteUserButton } from './DeleteUserButton';
+import { AddRoleButton } from './AddRoleButton';
+import { RoleBadges } from './RoleBadges';
 
+// Una fila por PERSONA -- roles es TODOS los roles que tiene, no uno solo
+// (antes era "role" singular y una persona con 2+ roles aparecía duplicada,
+// una fila por membership).
 type ProfileRow = {
   id: string;
   full_name: string;
   cedula: string;
   email: string;
-  role: string;
+  roles: string[];
   status: string;
   position: string | null;
 };
@@ -44,7 +49,10 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 function sortValue(p: ProfileRow, key: SortKey): string {
   switch (key) {
     case 'role':
-      return ROLE_LABELS[p.role] ?? p.role;
+      return p.roles
+        .map((r) => ROLE_LABELS[r] ?? r)
+        .sort()
+        .join(', ');
     case 'position':
       return p.position ? POSITION_LABELS[p.position] ?? p.position : '';
     default:
@@ -67,15 +75,28 @@ export function UsersTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('full_name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [query, setQuery] = useState('');
+
+  // `profiles` ya viene filtrada por rol desde el servidor (page.tsx agrupa
+  // por persona y aplica ?role= ahí) -- el buscador filtra en el cliente,
+  // en tiempo real, SOBRE ese resultado ya filtrado, así que ambos filtros
+  // quedan combinados (AND) en vez de que uno reemplace al otro. Por
+  // nombre parcial (case-insensitive) o cédula (substring, no requiere
+  // match exacto).
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return profiles;
+    return profiles.filter((p) => p.full_name.toLowerCase().includes(q) || p.cedula.toLowerCase().includes(q));
+  }, [profiles, query]);
 
   const sorted = useMemo(() => {
-    const list = [...profiles];
+    const list = [...filtered];
     list.sort((a, b) => {
       const cmp = sortValue(a, sortKey).localeCompare(sortValue(b, sortKey));
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return list;
-  }, [profiles, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir]);
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -89,8 +110,16 @@ export function UsersTable({
   const colCount = COLUMNS.length + 1;
 
   return (
-    <div className="mt-4 overflow-x-auto rounded-xl border border-neutral-200">
-      <table className="w-full min-w-[720px] border-collapse text-sm">
+    <div>
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Buscar por nombre o cédula..."
+        className="mt-4 w-full max-w-sm rounded-lg border border-neutral-300 px-3 py-1.5 text-sm placeholder:text-neutral-400 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+      />
+      <div className="mt-3 overflow-x-auto rounded-xl border border-neutral-200">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
             {COLUMNS.map((c) => (
@@ -125,19 +154,6 @@ export function UsersTable({
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-neutral-500">Rol</label>
-                      <select
-                        name="role"
-                        defaultValue={p.role}
-                        className="rounded-lg border border-neutral-300 px-2 py-1 text-sm"
-                      >
-                        <option value="deportista">Deportista</option>
-                        <option value="coach">Entrenador</option>
-                        <option value="scorekeeper">Scorekeeper</option>
-                        <option value="admin">Administrador</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
                       <label className="text-xs text-neutral-500">Estado</label>
                       <select
                         name="status"
@@ -148,7 +164,7 @@ export function UsersTable({
                         <option value="inactivo">Inactivo</option>
                       </select>
                     </div>
-                    {p.role === 'deportista' && (
+                    {p.roles.includes('deportista') && (
                       <div className="flex flex-col gap-1">
                         <label className="text-xs text-neutral-500">Posición</label>
                         <select
@@ -213,7 +229,9 @@ export function UsersTable({
                 <td className="px-3 py-2 font-medium text-neutral-900">{p.full_name}</td>
                 <td className="px-3 py-2 text-neutral-700">{p.cedula}</td>
                 <td className="px-3 py-2 text-neutral-700">{p.email}</td>
-                <td className="px-3 py-2 text-neutral-700">{ROLE_LABELS[p.role] ?? p.role}</td>
+                <td className="px-3 py-2">
+                  <RoleBadges personId={p.id} roles={p.roles} />
+                </td>
                 <td className="px-3 py-2">
                   <span
                     className={
@@ -226,11 +244,11 @@ export function UsersTable({
                   </span>
                 </td>
                 <td className="px-3 py-2 text-neutral-700">
-                  {p.role === 'deportista' && p.position ? POSITION_LABELS[p.position] ?? p.position : '—'}
+                  {p.roles.includes('deportista') && p.position ? POSITION_LABELS[p.position] ?? p.position : '—'}
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    {p.role === 'deportista' && (
+                    {p.roles.includes('deportista') && (
                       <a href={`/dashboard/reports/athletes/${p.id}`} className="text-brand-blue hover:underline">
                         Ver perfil
                       </a>
@@ -238,11 +256,12 @@ export function UsersTable({
                     <a href={`/dashboard/admin/users?edit=${p.id}`} className="text-brand-blue hover:underline">
                       Editar
                     </a>
-                    {p.role === 'coach' && (
+                    {p.roles.includes('coach') && (
                       <a href={`/dashboard/admin/users?assign=${p.id}`} className="text-brand-blue hover:underline">
                         Asignar equipos
                       </a>
                     )}
+                    <AddRoleButton personId={p.id} existingRoles={p.roles} />
                     <ResetPasswordButton userId={p.id} />
                     <DeleteUserButton userId={p.id} userName={p.full_name} />
                   </div>
@@ -258,7 +277,8 @@ export function UsersTable({
             </tr>
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

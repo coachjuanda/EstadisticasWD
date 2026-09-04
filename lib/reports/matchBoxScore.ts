@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import type { ReportPlayerRow, ReportStatDef, ReportTeamStats } from './types';
 
 export type MatchBoxScoreData = {
@@ -27,7 +28,7 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'unauthorized' };
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const membership = await getActiveMembership(supabase);
 
   const { data: match } = await supabase
     .from('matches')
@@ -52,9 +53,9 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
   // Control de acceso explícito por rol: admin ve cualquier partido de su
   // club, coach solo si el partido es de uno de sus equipos, deportista solo
   // si él mismo está en la nómina de ese equipo+torneo.
-  if (profile?.role === 'admin') {
+  if (membership?.role === 'admin') {
     // ok
-  } else if (profile?.role === 'coach') {
+  } else if (membership?.role === 'coach') {
     const { data: ct } = await supabase
       .from('coach_teams')
       .select('team_id')
@@ -62,7 +63,7 @@ export async function loadMatchBoxScore(supabase: SupabaseClient<any>, matchId: 
       .eq('team_id', match.home_team_id)
       .maybeSingle();
     if (!ct) return { ok: false, reason: 'unauthorized' };
-  } else if (profile?.role === 'deportista') {
+  } else if (membership?.role === 'deportista') {
     const { data: rp } = await supabase
       .from('roster_players')
       .select('id, rosters!inner(team_id, tournament_id)')

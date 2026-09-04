@@ -29,7 +29,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         return;
       }
 
-      router.push('/dashboard');
+      router.push(data.needsRoleSelection ? '/select-role' : '/dashboard');
       router.refresh();
     } catch {
       setError('No se pudo conectar con el servidor.');

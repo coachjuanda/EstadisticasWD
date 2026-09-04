@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership, getPeopleByRole } from '@/lib/auth/activeMembership';
 import { computeDueStatus } from '@/lib/evaluations/dueStatus';
 import { AdminEvaluationsTable, type EvaluationRow } from './AdminEvaluationsTable';
 import { setEvaluationDeadline } from './actions';
@@ -10,10 +11,9 @@ type ReportRow = {
   coach_id: string;
   division_id: string;
   athlete_profiles: { full_name: string } | null;
-  profiles: { full_name: string } | null;
+  people: { full_name: string } | null;
   divisions: { name: string } | null;
 };
-type PersonOption = { id: string; full_name: string };
 type DivisionOption = { id: string; name: string };
 
 export default async function AdminEvaluationsPage({
@@ -24,21 +24,18 @@ export default async function AdminEvaluationsPage({
   const { athlete_id, coach_id, division_id, error } = await searchParams;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from('profiles').select('club_id').eq('id', user!.id).single();
+  const membership = await getActiveMembership(supabase);
   const { data: club } = await supabase
     .from('clubs')
     .select('evaluation_deadline')
-    .eq('id', profile?.club_id as string)
+    .eq('id', membership?.clubId as string)
     .maybeSingle();
   const evaluationDeadline = club?.evaluation_deadline ?? null;
 
   let reportsQuery = supabase
     .from('evaluation_reports')
     .select(
-      'id, report_date, athlete_id, coach_id, division_id, athlete_profiles(full_name), profiles!coach_id(full_name), divisions(name)'
+      'id, report_date, athlete_id, coach_id, division_id, athlete_profiles(full_name), people!coach_id(full_name), divisions(name)'
     )
     .order('report_date', { ascending: false });
 
@@ -46,21 +43,11 @@ export default async function AdminEvaluationsPage({
   if (coach_id) reportsQuery = reportsQuery.eq('coach_id', coach_id);
   if (division_id) reportsQuery = reportsQuery.eq('division_id', division_id);
 
-  const [{ data: reports }, { data: athletes }, { data: coaches }, { data: divisions }, { data: allReports }] =
+  const [{ data: reports }, athletes, coaches, { data: divisions }, { data: allReports }] =
     await Promise.all([
       reportsQuery.returns<ReportRow[]>(),
-      supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('role', 'deportista')
-        .order('full_name')
-        .returns<PersonOption[]>(),
-      supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('role', 'coach')
-        .order('full_name')
-        .returns<PersonOption[]>(),
+      getPeopleByRole(supabase, 'deportista'),
+      getPeopleByRole(supabase, 'coach'),
       supabase.from('divisions').select('id, name').order('name').returns<DivisionOption[]>(),
       // Sin filtrar -- el semáforo de una fila se calcula contra la última
       // evaluación REAL de ese deportista, no contra la fecha de esa fila en
@@ -80,7 +67,7 @@ export default async function AdminEvaluationsPage({
   const rows: EvaluationRow[] = (reports ?? []).map((r) => ({
     id: r.id,
     athleteName: r.athlete_profiles?.full_name ?? '—',
-    coachName: r.profiles?.full_name ?? '—',
+    coachName: r.people?.full_name ?? '—',
     divisionName: r.divisions?.name ?? '—',
     reportDate: r.report_date,
     dueStatus: computeDueStatus(lastReportDateByAthlete.get(r.athlete_id) ?? null, evaluationDeadline),

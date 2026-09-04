@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getActiveMembership, requireRole } from '@/lib/auth/activeMembership';
 
 const BASE_PATH = '/dashboard/admin/matches';
 
@@ -11,18 +12,10 @@ function friendlyError(error: { code?: string; message: string }) {
 }
 
 async function getClubId(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  const membership = await getActiveMembership(supabase);
+  if (!membership) redirect('/login');
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('club_id')
-    .eq('id', user.id)
-    .single();
-
-  return profile?.club_id as string;
+  return membership.clubId;
 }
 
 function parseMatchForm(formData: FormData) {
@@ -110,14 +103,7 @@ export async function forceDeleteMatch(formData: FormData) {
   const confirmation = (formData.get('confirmation') as string)?.trim();
 
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') redirect('/dashboard?error=unauthorized');
+  await requireRole(supabase, 'admin');
 
   const { data: match } = await supabase.from('matches').select('away_team_name').eq('id', id).single();
 

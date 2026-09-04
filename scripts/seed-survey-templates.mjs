@@ -164,8 +164,8 @@ const TEMPLATES = [
 
 async function main() {
   const { data: admin, error: adminError } = await supabase
-    .from('profiles')
-    .select('id, club_id')
+    .from('memberships')
+    .select('person_id, club_id')
     .eq('role', 'admin')
     .limit(1)
     .maybeSingle();
@@ -196,7 +196,7 @@ async function main() {
         target: tpl.target,
         description: tpl.description,
         club_id: admin.club_id,
-        created_by: admin.id,
+        created_by: admin.person_id,
       })
       .select('id')
       .single();

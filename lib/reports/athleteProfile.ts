@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import type { LoadResult } from './matchBoxScore';
 
 const POSITION_LABELS: Record<string, string> = {
@@ -71,7 +72,7 @@ export async function loadAthleteProfile(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, reason: 'unauthorized' };
 
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  const membership = await getActiveMembership(supabase);
 
   const { data: athlete } = await supabase
     .from('athlete_profiles')
@@ -81,9 +82,9 @@ export async function loadAthleteProfile(
 
   if (!athlete) return { ok: false, reason: 'not_found' };
 
-  if (profile?.role === 'admin') {
+  if (membership?.role === 'admin') {
     // ok
-  } else if (profile?.role === 'coach') {
+  } else if (membership?.role === 'coach') {
     const { data: ct } = await supabase.from('coach_teams').select('team_id').eq('coach_id', user.id);
     const teamIds = (ct ?? []).map((t) => t.team_id);
     if (teamIds.length === 0) return { ok: false, reason: 'unauthorized' };
@@ -94,7 +95,7 @@ export async function loadAthleteProfile(
       .in('rosters.team_id', teamIds)
       .maybeSingle();
     if (!rp) return { ok: false, reason: 'unauthorized' };
-  } else if (profile?.role === 'deportista') {
+  } else if (membership?.role === 'deportista') {
     if (athleteId !== user.id) return { ok: false, reason: 'unauthorized' };
   } else {
     return { ok: false, reason: 'unauthorized' };

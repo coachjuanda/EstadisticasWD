@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getActiveMembership } from '@/lib/auth/activeMembership';
 import type { LoadResult } from './matchBoxScore';
 
 // Loader compartido por la página /dashboard/admin/training y sus 4 rutas de
@@ -23,7 +24,7 @@ type AttendanceRow = {
 type CoachAttendanceRow = {
   coach_id: string;
   training_session_id: string;
-  profiles: { full_name: string } | null;
+  people: { full_name: string } | null;
   training_sessions: {
     scheduled_at: string;
     training_session_divisions: { divisions: { name: string } | null }[];
@@ -34,13 +35,9 @@ async function requireAdmin(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>
 ): Promise<LoadResult<true>> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, reason: 'unauthorized' };
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role !== 'admin') return { ok: false, reason: 'unauthorized' };
+  const membership = await getActiveMembership(supabase);
+  if (!membership) return { ok: false, reason: 'unauthorized' };
+  if (membership.role !== 'admin') return { ok: false, reason: 'unauthorized' };
 
   return { ok: true, data: true };
 }
@@ -154,7 +151,7 @@ export async function loadCoachTrainingAttendance(
   let coachQuery = supabase
     .from('training_session_coaches')
     .select(
-      'coach_id, training_session_id, profiles(full_name), training_sessions!inner(scheduled_at, training_session_divisions(divisions(name)))'
+      'coach_id, training_session_id, people(full_name), training_sessions!inner(scheduled_at, training_session_divisions(divisions(name)))'
     );
   if (dateFrom) coachQuery = coachQuery.gte('training_sessions.scheduled_at', `${dateFrom}T00:00:00`);
   if (dateTo) coachQuery = coachQuery.lte('training_sessions.scheduled_at', `${dateTo}T23:59:59`);
@@ -165,7 +162,7 @@ export async function loadCoachTrainingAttendance(
   const aggMap = new Map<string, CoachAttendanceSummaryRow>();
   for (const row of rows) {
     if (!aggMap.has(row.coach_id)) {
-      aggMap.set(row.coach_id, { coachId: row.coach_id, fullName: row.profiles?.full_name ?? '—', sessionsPresent: 0 });
+      aggMap.set(row.coach_id, { coachId: row.coach_id, fullName: row.people?.full_name ?? '—', sessionsPresent: 0 });
     }
     aggMap.get(row.coach_id)!.sessionsPresent += 1;
   }
@@ -183,7 +180,7 @@ export async function loadCoachTrainingAttendance(
     }))
     .sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
 
-  const coachName = coachId ? summary.find((c) => c.coachId === coachId)?.fullName ?? rows.find((r) => r.coach_id === coachId)?.profiles?.full_name : undefined;
+  const coachName = coachId ? summary.find((c) => c.coachId === coachId)?.fullName ?? rows.find((r) => r.coach_id === coachId)?.people?.full_name : undefined;
 
   return {
     ok: true,

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getPeopleByRole } from '@/lib/auth/activeMembership';
 import { loadAthleteTrainingAttendance, loadCoachTrainingAttendance } from '@/lib/reports/trainingAttendance';
 
 type DivisionOption = { id: string; name: string };
-type PersonOption = { id: string; full_name: string };
 
 function toArray(value: string | string[] | undefined): string[] {
   if (!value) return [];
@@ -41,14 +41,9 @@ export default async function AdminTrainingPage({
   const divisionIds = toArray(division_id);
   const supabase = await createClient();
 
-  const [{ data: divisions }, { data: athletes }, athleteResult, coachResult] = await Promise.all([
+  const [{ data: divisions }, athletes, athleteResult, coachResult] = await Promise.all([
     supabase.from('divisions').select('id, name').order('name').returns<DivisionOption[]>(),
-    supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'deportista')
-      .order('full_name')
-      .returns<PersonOption[]>(),
+    getPeopleByRole(supabase, 'deportista'),
     loadAthleteTrainingAttendance(supabase, { divisionIds, dateFrom: date_from, dateTo: date_to, athleteId: athlete_id }),
     loadCoachTrainingAttendance(supabase, { dateFrom: date_from, dateTo: date_to, coachId: coach_id }),
   ]);
